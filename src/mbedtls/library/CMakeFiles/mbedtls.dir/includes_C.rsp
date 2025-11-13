@@ -1,0 +1,1 @@
+-IC:/msys64/home/Daniil/mbedtls/include -IC:/msys64/home/Daniil/mbedtls/library -IC:/msys64/home/Daniil/mbedtls/build/library -IC:/msys64/home/Daniil/mbedtls/3rdparty/everest/include -I"C:/msys64/home/Daniil/mbedtls/3rdparty/p256-m" -I"C:/msys64/home/Daniil/mbedtls/3rdparty/p256-m/p256-m"
