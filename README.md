@@ -1,53 +1,54 @@
 # rp2040-freertos-template
 
-Шаблон прошивки на FreeRTOS для плат на RP2040 (по умолчанию Waveshare RP2040 Zero). В комплекте демо, эмулирующее ответы GPS-приёмника u‑blox по протоколу UBX, таймеры FreeRTOS, индикацию WS2812, простую SHA‑256 и сохранение режима во флеш.
+Шаблон прошивки на FreeRTOS для Waveshare RP2040 Zero: два режима работы GPS-спуфера под UBX, таймеры NAV/MON, сбор SHA-256 и подпись ECDSA secp192r1 (micro-ecc), индикация WS2812 и сохранение режима в flash.
 
-## Что умеет демо
-- FreeRTOS + Pico SDK 2.1.0, задачи для индикации и обновления временных меток/CRC.
-- Эмуляция UBX: ответы на CFG-PRT/RATE/MSG/VALSET/CFG/GNSS/PMS и др.; генерация NAV_PVT/NAV_SVINFO/NAV_POS*/MON_RF/TIMEUTC/CLOCK и других пакетов с настраиваемой частотой.
-- Накопление переданных пакетов в SHA-256 и периодическая отправка SEC_ECSIGN (шаблоны пакетов в `src/massivs.h`).
-- Переключение режима кнопкой на GPIO6: аппаратный UART0 ↔ PIO-UART; выбранный режим и цвет WS2812 сохраняются во флеш в секции `.my_section`.
-- Локальные статические библиотеки OpenSSL уже лежат в `src/OSSL`; mbedTLS — в `src/mbedtls` (по умолчанию не подключается).
+## Стек и компоненты
+- FreeRTOS + Pico SDK 2.1.0, PIO-UART (RX на GPIO3, вывод в GPIO0), PIO-WS2812 (GPIO16).
+- UBX-сообщения в `src/massivs.h`: CFG-*, NAV_PVT/NAV_SVINFO/NAV_POS*/MON_RF/TIMEUTC/CLOCK и др.
+- SHA-256 своя (`src/sha256.c`), подпись ECDSA secp192r1 через micro-ecc (`src/uECC.*`): первичный hash → вторичный hash с session_id → сворачивание до 192 бит → `uECC_sign_deterministic`.
+- Статические OpenSSL библиотеки лежат в `src/OSSL` (используются только для линковки sha256.c), mbedTLS присутствует, но по умолчанию не подключен. TinyUSB отключён, субмодуль SDK можно не инициализировать.
 
-## Требования
-- Плата на RP2040; `PICO_BOARD` по умолчанию `waveshare_rp2040_zero`.
-- ARM GCC toolchain, CMake ≥ 3.12, Ninja/Make, `git` (для подмодуля).
-- Подмодуль `lib/FreeRTOS-Kernel` (`git submodule update --init --recursive`).
-- Pico SDK 2.1.0 уже в репозитории (`pico-sdk-2.1.0`); при желании можно переопределить `PICO_SDK_PATH`.
-- USB/TinyUSB не инициализирован (если нужно — подтяните submodule tinyusb в SDK).
+## Аппаратные сигналы
+- WS2812: GPIO16. Синий/зелёный/красный отражают режимы.
+- Кнопка: GPIO6 (IRQ) переключает режим и пишет его в flash `.my_section` по адресу 0x10040000 вместе с цветом.
+- Светодиод питания: GPIO5.
+- UART0: TX=GPIO0, RX=GPIO1 (обычный режим).
+- PIO-UART «сквозной»: вход с GPIO3, вывод на GPIO0 (режим passthrough).
 
-## Структура
-- `CMakeLists.txt` — верхний уровень, подключает Pico SDK и FreeRTOS.
-- `src/CMakeLists.txt` — цели прошивки, генерация PIO заголовков, линковка с локальными OpenSSL (`src/OSSL/lib/libssl.a`, `libcrypto.a`).
-- `src/main.c` — логика FreeRTOS: обработка UBX, таймеры выдачи пакетов, сохранение режима во флеш, индикация WS2812, SHA-256.
-- `src/massivs.h` — набор готовых UBX пакетов.
-- `src/sha256.c/.h` — простая реализация SHA-256.
-- `src/uart_rx.pio`, `src/uart_tx.pio`, `src/ws2812.pio` и сгенерированные заголовки.
-- `src/memory.x` — линкерный скрипт: секция `.my_section` по адресу `0x10040000`.
-- `lib/FreeRTOS-Kernel`, `pico-sdk-2.1.0`, `src/OSSL`, `src/mbedtls` — зависимости в репозитории.
-
-## Сборка
+## Собрать
 ```bash
-git submodule update --init --recursive
+git submodule update --init --recursive   # FreeRTOS-Kernel и pico-sdk, если не скачаны
 cmake -B build -G "Ninja" -DPICO_BOARD=waveshare_rp2040_zero
 cmake --build build
 ```
-Результаты: `build/src/podmena.uf2` (для загрузчика RP2040) и `podmena.elf/bin/hex`. Если нужен другой путь к SDK: `-DPICO_SDK_PATH=/ваш/путь/pico-sdk-2.1.0`.
+Артефакты: `build/src/podmena.uf2` (для прошивки), `build/src/podmena.elf/bin/hex`.
 
-## Работа прошивки
-- WS2812 на GPIO16 мигает раз в 500 мс; GPIO5 — управляющий вывод. GPIO6 с IRQ переключает режим:
-  - `regim=0` — режим «эмулятор»: прошивка сама отвечает на UBX-запросы через аппаратный UART0 (TX=GPIO0, RX=GPIO1), скорость по умолчанию 115200 бод.
-  - `regim=1` — режим «прозрачный»: прошивка не отвечает сама, а пропускает ответы, приходящие на вход PIO-UART с GPIO3 (RX), далее выдаёт их на GPIO0 (TX) через тот же PIO. Аппаратный UART0 при этом выключен.
-  Состояние (режим и цвет) сохраняется во флеш в `.my_section`.
-- Таймеры FreeRTOS 1 Гц и 10 Гц рассылают NAV_PVT/NAV_SVINFO, m10_* таймеры управляют NAV_*/MON_RF и SEC_ECSIGN; `callback_m10_timer_nav` копит SHA-256, `callback_m10_timer_sign` отправляет подпись.
-- `SecundaTaskCRC` раз в секунду инкрементирует время в NAV_PVT/NAV_TIMEUTC и пересчитывает CK_A/CK_B.
-- Обработчик `UART0_IRQ` разбирает команды: смена скорости (CFG-PRT), частоты (CFG-RATE/VALSET), выбор пакетов (CFG-MSG/VALSET), запросы CFG-CFG/GNSS/PMS/SEC-UNIQID/MGA-DBD и т.п.; ответы из `massivs.h`.
+## Как работает
+- Таймеры FreeRTOS 1 Гц/10 Гц шлют NAV_PVT, NAV_SVINFO и другие включённые UBX. CRC CK_A/CK_B считается в `CRC_gen`.
+- `callback_m10_timer_nav` отправляет выбранные сообщения и одновременно копит SHA-256 первичного потока.
+- `callback_m10_timer_sign`:
+  1. Финализирует первичный SHA-256 (hash оригинальных сообщений) и записывает его в `SEC_ECSIGN`.
+  2. Считает вторичный hash = SHA256(primary_hash + SEC_SESSION_ID).
+  3. Сворачивает вторичный hash до 24 байт XOR'ом верхних 8 байт.
+  4. Формирует буфер для подписи: folded(24) + SEC_SESSION_ID(24).
+  5. Подписывает secp192r1 детерминированно (`uECC_sign_deterministic`), R и S кладёт в `SEC_ECSIGN`.
+  6. Пересчитывает CRC и отправляет UBX-SEC-ECSIGN.
+- Режимы:
+  - `regim=0` — обычный: приём/ответ через UART0.
+  - `regim=1` — сквозной: вход с GPIO3 (PIO-UART), вывод на GPIO0, UART0 отключён.
 
-## Настройка
-- Правьте содержимое UBX пакетов в `src/massivs.h` и логику в `src/main.c` (пины: WS2812 — GPIO16, кнопка — GPIO6, UART0 — GPIO0/1, PIO-UART — GPIO3).
-- Параметры FreeRTOS — `src/FreeRTOSConfig.h` (альтернатива `src/__FreeRTOSConfig.h`).
-- При переносе на другую плату обновите `PICO_BOARD` и при необходимости адрес `.my_section` в `src/memory.x`.
-- Если хотите линковаться с mbedTLS вместо OpenSSL — раскомментируйте соответствующие строки в `src/CMakeLists.txt` и убедитесь, что нужные архивы присутствуют в `src/mbedtls/library`.
+## Настройки и файлы
+- `src/massivs.h`: все UBX-шаблоны, `SEC_PRIV_KEY` (24 байта, заполните свой), `SEC_SESSION_ID` (24 байта, по умолчанию нули).
+- `src/main.c`: логика таймеров, подсчёт SHA, подпись, обработчики UART/PIO/кнопки.
+- `src/memory.x`: закрепляет `.my_section` по адресу 0x10040000 под состояние режима и цвета.
+- `src/CMakeLists.txt`: подключает `uECC.c`, `sha256.c`, статические `libssl.a/libcrypto.a` из `src/OSSL`.
 
-## Примечание по предупреждениям сборки
-Компилятор может ругнуться на `PICO_FLASH_ASSUME_CORE1_SAFE` (переопределение) и на `memcpy` из адреса `0x10040000` в `main.c`. Для чистой сборки можно удалить свой `#define PICO_FLASH_ASSUME_CORE1_SAFE` и привести адрес к указателю `(const void *)CUSTOM_SECTION_START` или читать флеш через API Pico.
+## Зависимости
+- ARM GCC toolchain, CMake ≥ 3.12, Ninja/Make.
+- Pico SDK 2.1.0 (путь задаётся `PICO_SDK_PATH` или локальной папкой `pico-sdk-2.1.0`).
+- FreeRTOS-Kernel как субмодуль в `lib/`.
+- Для USB понадобится инициализировать tinyusb в SDK (необязательно).
+
+## Примечания
+- В `main.c` используется чтение из flash по `0x10040000`; при необходимости уберите `PICO_FLASH_ASSUME_CORE1_SAFE`.
+- Ключ и session_id равны нулю по умолчанию — замените на реальные значения перед использованием подписи.

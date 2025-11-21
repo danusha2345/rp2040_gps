@@ -109,7 +109,7 @@ void CRC_gen(uint8_t *adr, int razmer)
         adr[N+1] = CK_B;
 }
 
-// ------- ����� SHA-256 ��� uECC_sign_deterministic -------
+// ------- Локальный SHA-256 для uECC_sign_deterministic -------
 #define ROTRIGHT_LOCAL(word, bits) (((word) >> (bits)) | ((word) << (32 - (bits))))
 #define CH_LOCAL(x, y, z) (((x) & (y)) ^ (~(x) & (z)))
 #define MAJ_LOCAL(x, y, z) (((x) & (y)) ^ ((x) & (z)) ^ ((y) & (z)))
@@ -326,31 +326,31 @@ void callback_m10_timer_meas( TimerHandle_t xTimer ){
 
 int8_t count_uart_mes_for_sha256 = 0;
 void callback_m10_timer_sign( TimerHandle_t xTimer ){
-        // 1) ��������� ������� SHA-256 � ��������� ���
+                // 1) Фиксируем текущий SHA-256 и забираем итог
         sha256_final();
         uint8_t primary_hash[32];
         memcpy(primary_hash, hash, sizeof(primary_hash));
 
-        // 2) �������� (primary_hash + session_id) -> ��������� SHA-256
+                // 2) Считаем (primary_hash + session_id) → вторичный SHA-256
         sha256_cleanup();
         sha256_init();
         sha256_update(primary_hash, sizeof(primary_hash));
         sha256_update(SEC_SESSION_ID, sizeof(SEC_SESSION_ID));
-        sha256_final(); // ������ hash �������� ��������� ��������
+                sha256_final(); // после этого hash содержит вторичный результат
 
-        // 3) ����������� 32 ����� � 24 �����
+                // 3) Сворачиваем 32 байта в 24 байта
         uint8_t folded[24];
         memcpy(folded, hash, 24);
         for (int i = 0; i < 8; i++) {
                 folded[i] ^= hash[24 + i];
         }
 
-        // 4) ��������� ��������� ��� �������: folded (24) + session_id (24)
+                // 4) Готовим сообщение для подписи: folded (24) + session_id (24)
         uint8_t sign_input[48];
         memcpy(sign_input, folded, 24);
         memcpy(sign_input + 24, SEC_SESSION_ID, 24);
 
-        // 5) ����������� secp192r1 (uECC_sign_deterministic)
+                // 5) Подписываем secp192r1 (uECC_sign_deterministic)
         uint8_t r_sig[24] = {0};
         uint8_t s_sig[24] = {0};
         const struct uECC_Curve_t *curve192 = uECC_secp192r1();
@@ -369,7 +369,7 @@ void callback_m10_timer_sign( TimerHandle_t xTimer ){
                 memcpy(s_sig, signature + 24, 24);
         }
 
-        // 6) �������� SEC_ECSIGN: ��������� hash, session_id, R,S
+                // 6) Собираем SEC_ECSIGN: первичный hash, session_id, R,S
         memcpy(&SEC_ECSIGN[10], primary_hash, 32);
         memcpy(&SEC_ECSIGN[42], SEC_SESSION_ID, 24);
         memcpy(&SEC_ECSIGN[66], r_sig, 24);
@@ -383,7 +383,7 @@ void callback_m10_timer_sign( TimerHandle_t xTimer ){
                 xSemaphoreGive(uart_mutex);
         }
 
-        // 7) ��������� � ���������� �����
+                // 7) Сбрасываем и подготавливаем хешер
         sha256_cleanup();
         sha256_init();
 }
