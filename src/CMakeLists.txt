@@ -1,7 +1,7 @@
 
 link_directories(${CMAKE_CURRENT_LIST_DIR}/OSSL/lib
                 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library  )
-add_executable(podmena main.c sha256.c)
+add_executable(podmena main.c sha256.c uECC.c)
 #set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/build)
 #set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/build)
 
