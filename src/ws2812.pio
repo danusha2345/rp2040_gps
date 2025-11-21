@@ -21,13 +21,13 @@
 .lang_opt python out_shiftdir = 1
 
 .wrap_target
-bitloop:
-    out x, 1       side 0 [T3 - 1] ; Side-set still takes place when instruction stalls
-    jmp !x do_zero side 1 [T1 - 1] ; Branch on the bit we shifted out. Positive pulse
+bitloop:                           ; Один бит GRB-потока
+    out x, 1       side 0 [T3 - 1] ; Вытащили бит в X, линия low на время T3
+    jmp !x do_zero side 1 [T1 - 1] ; Если бит=1 — держим high (T1)
 do_one:
-    jmp  bitloop   side 1 [T2 - 1] ; Continue driving high, for a long pulse
+    jmp  bitloop   side 1 [T2 - 1] ; Бит=1: продолжаем high ещё на T2
 do_zero:
-    nop            side 0 [T2 - 1] ; Or drive low, for a short pulse
+    nop            side 0 [T2 - 1] ; Бит=0: сразу в low на T2
 .wrap
 
 % c-sdk {
@@ -53,16 +53,17 @@ static inline void ws2812_program_init(PIO pio, uint sm, uint offset, uint pin, 
 %}
 
 .program ws2812_parallel
+; Параллельная выдача 32-битного слова на группу пинов
 
 .define public T1 3
 .define public T2 3
 .define public T3 4
 
 .wrap_target
-    out x, 32
-    mov pins, !null [T1-1]
-    mov pins, x     [T2-1]
-    mov pins, null  [T3-2]
+    out x, 32                  ; Забираем 32 бита из FIFO
+    mov pins, !null [T1-1]     ; Стартовый импульс на всех линиях (все 1)
+    mov pins, x     [T2-1]     ; Выводим данные
+    mov pins, null  [T3-2]     ; Задержка для сброса в 0
 .wrap
 
 % c-sdk {

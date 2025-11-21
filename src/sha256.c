@@ -2,7 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Глобальные переменные
+// Глобальное состояние минимальной реализации SHA-256:
+// ctx — рабочий контекст (в куче), hash[32] — итоговый дайджест после sha256_final().
 SHA256_CTX *ctx = NULL;
 uint8_t hash[32];
 
@@ -29,6 +30,7 @@ static const uint32_t k[64] = {
 };
 
 void sha256_init() {
+    // Выделяем (или перевыделяем) контекст и загружаем начальные константы из стандарта.
     if(ctx) free(ctx);
     ctx = malloc(sizeof(SHA256_CTX));
     ctx->datalen = 0;
@@ -44,15 +46,18 @@ void sha256_init() {
 }
 
 void sha256_transform() {
+    // Сжимаем один 512-битный блок из ctx->data в ctx->state.
     uint32_t a, b, c, d, e, f, g, h, i, j, t1, t2;
     uint32_t w[64];
 
+    // Первые 16 слов — big-endian из входного блока
     for (i = 0, j = 0; i < 16; i++, j += 4)
         w[i] = ((uint32_t)ctx->data[j] << 24) | 
                ((uint32_t)ctx->data[j+1] << 16) | 
                ((uint32_t)ctx->data[j+2] << 8) | 
                ctx->data[j+3];
 
+    // Остальные — расширение расписания
     for (; i < 64; i++)
         w[i] = SIG1(w[i-2]) + w[i-7] + SIG0(w[i-15]) + w[i-16];
 
@@ -65,6 +70,7 @@ void sha256_transform() {
     g = ctx->state[6];
     h = ctx->state[7];
 
+    // Основной цикл (64 раунда)
     for (i = 0; i < 64; i++) {
         t1 = h + EP1(e) + CH(e, f, g) + k[i] + w[i];
         t2 = EP0(a) + MAJ(a, b, c);
@@ -89,6 +95,7 @@ void sha256_transform() {
 }
 
 void sha256_update(const uint8_t *data, size_t len) {
+    // Подкармливаем любые данные; каждый полный блок в 64 байта отправляем в transform()
     for (size_t i = 0; i < len; i++) {
         ctx->data[ctx->datalen] = data[i];
         if (++ctx->datalen == 64) {
@@ -100,6 +107,7 @@ void sha256_update(const uint8_t *data, size_t len) {
 }
 
 void sha256_final() {
+    // Пэддинг, добавление длины, финальный transform и выгрузка hash[32]
     uint32_t i = ctx->datalen;
 
     ctx->data[i++] = 0x80;

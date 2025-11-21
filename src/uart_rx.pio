@@ -8,10 +8,10 @@
 .program uart_rx_mini
 
 .wrap_target
-    wait 1 pin 0
-    set pins, 1
-    wait 0 pin 0
-    set pins, 0
+    wait 1 pin 0        ; ждем высокий уровень (idle)
+    set pins, 1         ; подаем стартовый импульс на выход
+    wait 0 pin 0        ; ждем переход в 0 (старт-бит)
+    set pins, 0         ; фиксируем 0 на выходе
 .wrap
 
 % c-sdk {
@@ -47,25 +47,22 @@ pio_sm_config c = uart_rx_mini_program_get_default_config(offset);
 %}
 
 .program uart_rx
-
-; Slightly more fleshed-out 8n1 UART receiver which handles framing errors and
-; break conditions more gracefully.
-; IN pin 0 and JMP pin are both mapped to the GPIO used as UART RX.
+; Полный приёмник 8n1 для UART RX c проверкой стоп-бита/ошибок
 
 start:
-    wait 0 pin 0        ; Stall until start bit is asserted
-    set x, 7    [10]    ; Preload bit counter, then delay until halfway through
-bitloop:                ; the first data bit (12 cycles incl wait, set).
-    in pins, 1          ; Shift data bit into ISR
-    jmp x-- bitloop [6] ; Loop 8 times, each loop iteration is 8 cycles
-    jmp pin good_stop   ; Check stop bit (should be high)
+    wait 0 pin 0        ; Ждем старт-бит (падение линии)
+    set x, 7    [10]    ; Счётчик битов = 7, задержка до середины 1-го бита
+bitloop:                ; Цикл выборки 8 бит (каждый шаг 8 циклов)
+    in pins, 1          ; Сдвиг 1 бита в ISR
+    jmp x-- bitloop [6] ; Повторять, пока X не станет -1
+    jmp pin good_stop   ; Проверяем стоп-бит (должен быть 1)
 
-    irq 4 rel           ; Either a framing error or a break. Set a sticky flag,
-    wait 1 pin 0        ; and wait for line to return to idle state.
-    jmp start           ; Don't push data if we didn't see good framing.
+    irq 4 rel           ; Ошибка кадра/обрыв — ставим флаг
+    wait 1 pin 0        ; Ждем возврата линии в idle
+    jmp start           ; Плохой кадр не пушим
 
-good_stop:              ; No delay before returning to start; a little slack is
-    push                ; important in case the TX clock is slightly too fast.
+good_stop:              ; Стоп-бит валиден
+    push                ; Кладем байт в FIFO
 
 
 % c-sdk {
