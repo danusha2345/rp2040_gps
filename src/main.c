@@ -57,7 +57,7 @@ void setup_uart0();
 void off_uart0();
 void on_uart_rx0_for_sem();
 //uintptr_t params[2];
-PIO pio, pio2, pio3;
+PIO pio, pio2;
 uint sm, sm2, sm3, offset_sk, offset2, offset3 ;
 uint skorost_uart_0 = 115200;
 volatile uint8_t r , g, b ;
@@ -86,6 +86,11 @@ static inline uint32_t urgb_u32(uint8_t r, uint8_t g, uint8_t b) {
             ((uint32_t) (r) << 8) |
             ((uint32_t) (g) << 16) |
             (uint32_t) (b);
+}
+
+// Универсальный funcsel для выбранного PIO (pio0 или pio1)
+static inline uint gpio_funcsel_for_pio(PIO inst) {
+        return inst == pio0 ? GPIO_FUNC_PIO0 : GPIO_FUNC_PIO1;
 }
 
 volatile int count = 0;
@@ -447,11 +452,11 @@ void gpio_6_on(void) {
         b = 100;
         
         off_uart0();
-        gpio_set_function(0, PIO_FUNCSEL_NUM(pio2, 0));
-        pio_sm_set_enabled(pio_sk, sm_sk, true);
-        flag_gpio6 = 0;
-        
-        program_erase(params);
+                        gpio_set_function(0, gpio_funcsel_for_pio(pio2));
+                        pio_sm_set_enabled(pio_sk, sm_sk, true);
+                        flag_gpio6 = 0;
+
+                        program_erase(params);
         data[3] = r;
         data[2] = g;
         data[1] = b;
@@ -499,7 +504,7 @@ void gpio_button_task(void *pvParameters) {
                         if (flag_gpio6 == 1) {
                                 r = 0; g = 0; b = 100;
                                 off_uart0();
-                                gpio_set_function(0, PIO_FUNCSEL_NUM(pio2,0));
+                                gpio_set_function(0, gpio_funcsel_for_pio(pio2));
                                 pio_sm_set_enabled(pio_sk, sm_sk, true);
                                 flag_gpio6 = 0;
 
@@ -617,7 +622,7 @@ int main() {
                 }
         else{
                 off_uart0();
-                gpio_set_function(0, PIO_FUNCSEL_NUM(pio2,0));
+                gpio_set_function(0, gpio_funcsel_for_pio(pio2));
                 pio_sm_set_enabled(pio2, sm2, true);
                 flag_gpio6 = 0;
         }
