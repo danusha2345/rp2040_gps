@@ -22,6 +22,7 @@
 #include <string.h>
 #include "massivs.h"
 #include "sha256.h"
+// Для подписи secp192r1 можно подключить mbedtls, но локальные библиотеки под ARM отсутствуют
 //#include "mbedtls/sha256.h"
 //#include <openssl/evp.h>
 
@@ -29,7 +30,6 @@
 // Адрес начала пользовательской секции
 #define CUSTOM_SECTION_START 0x10040000
 #define FLASH_TARGET_OFFSET (256 * 1024)
-#define PICO_FLASH_ASSUME_CORE1_SAFE = 1
 
 // Переменные, размещённые в .my_section
 uint32_t my_variable1 __attribute__((section(".my_section"))) = 0x00006400;
@@ -189,9 +189,40 @@ void callback_m10_timer_meas( TimerHandle_t xTimer ){
 
 int8_t count_uart_mes_for_sha256 = 0;
 void callback_m10_timer_sign( TimerHandle_t xTimer ){
+        // 1) Завершаем текущий SHA-256 и сохраняем его
         sha256_final();
-        for(int8_t i=0; i<32; i++)
-                {SEC_ECSIGN[10+i] = hash[i];};
+        uint8_t primary_hash[32];
+        memcpy(primary_hash, hash, sizeof(primary_hash));
+
+        // 2) Хешируем (primary_hash + session_id) -> вторичный SHA-256
+        sha256_cleanup();
+        sha256_init();
+        sha256_update(primary_hash, sizeof(primary_hash));
+        sha256_update(SEC_SESSION_ID, sizeof(SEC_SESSION_ID));
+        sha256_final(); // теперь hash содержит вторичное значение
+
+        // 3) Сворачиваем 32 байта в 24 байта
+        uint8_t folded[24];
+        memcpy(folded, hash, 24);
+        for (int i = 0; i < 8; i++) {
+                folded[i] ^= hash[24 + i];
+        }
+
+        // 4) Формируем сообщение для подписи: folded (24) + session_id (24)
+        uint8_t sign_input[48];
+        memcpy(sign_input, folded, 24);
+        memcpy(sign_input + 24, SEC_SESSION_ID, 24);
+
+        // 5) Подписываем secp192r1 — пока заглушка (R,S будут нулевые, заполните SEC_PRIV_KEY и подключите mbedtls)
+        uint8_t r_sig[24] = {0};
+        uint8_t s_sig[24] = {0};
+        // TODO: подключить mbedtls и вычислять ECDSA по folded+session с ключом SEC_PRIV_KEY
+
+        // 6) Собираем SEC_ECSIGN: первичный hash, session_id, R,S
+        memcpy(&SEC_ECSIGN[10], primary_hash, 32);
+        memcpy(&SEC_ECSIGN[42], SEC_SESSION_ID, 24);
+        memcpy(&SEC_ECSIGN[66], r_sig, 24);
+        memcpy(&SEC_ECSIGN[90], s_sig, 24);
         SEC_ECSIGN[8] = count_uart_mes_for_sha256;
         count_uart_mes_for_sha256 = 0;
 
@@ -200,6 +231,8 @@ void callback_m10_timer_sign( TimerHandle_t xTimer ){
                 uart_write_blocking(uart0, SEC_ECSIGN, sizeof(SEC_ECSIGN));
                 xSemaphoreGive(uart_mutex);
         }
+
+        // 7) Готовимся к следующему циклу
         sha256_cleanup();
         sha256_init();
 }
@@ -422,7 +455,7 @@ int main() {
         // -----------------------------------------
         // считываем из области памяти записанные значения в переменные --------------------------------------
         uint8_t regim_iz_pamati[4];
-        memcpy(regim_iz_pamati, CUSTOM_SECTION_START, sizeof(regim_iz_pamati));
+        memcpy(regim_iz_pamati, (const void *)CUSTOM_SECTION_START, sizeof(regim_iz_pamati));
         r = regim_iz_pamati[3];
         g = regim_iz_pamati[2];
         b = regim_iz_pamati[1];
