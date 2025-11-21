@@ -1,5 +1,6 @@
 #include "FreeRTOS.h"
 #include "task.h"
+#include "semphr.h"
 #include <stdio.h>
 #include <inttypes.h>
 #include "pico/multicore.h"
@@ -42,6 +43,8 @@ volatile uint8_t data[FLASH_PAGE_SIZE];
 #define Timer_15_sec pdMS_TO_TICKS( 15000 )
 TimerHandle_t NavRateTimer, MeasRateTimer, m10_timer_meas, m10_timer_nav, m10_timer_sign, timer_15sec;
 TaskHandle_t uartna;
+SemaphoreHandle_t gpio_button_sem;
+SemaphoreHandle_t uart_mutex;
  
 // Контекст SHA-256
 //SHA256_CTX ctx;
@@ -159,14 +162,24 @@ volatile bool s0d01 = 0, s0a09 = 0, s0101 = 0, s0102 = 0, s0121 = 0, s0112 = 0, 
 void callback_1hz( TimerHandle_t xTimer ){
         flag++;
         secunda2();
-        if (s0130) {uart_write_blocking(uart0, UBX_NAV_SVINFO, sizeof(UBX_NAV_SVINFO));};
+        if (s0130) {
+                if (xSemaphoreTake(uart_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                        uart_write_blocking(uart0, UBX_NAV_SVINFO, sizeof(UBX_NAV_SVINFO));
+                        xSemaphoreGive(uart_mutex);
+                }
+        }
         flag--;
 }
 
 void callback_10hz( TimerHandle_t xTimer ){
         flag++;
         secunda();
-        if (s0107) {uart_write_blocking(uart0, UBX_NAV_PVT, sizeof(UBX_NAV_PVT));};
+        if (s0107) {
+                if (xSemaphoreTake(uart_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                        uart_write_blocking(uart0, UBX_NAV_PVT, sizeof(UBX_NAV_PVT));
+                        xSemaphoreGive(uart_mutex);
+                }
+        }
         flag--;
 }
 
@@ -181,39 +194,47 @@ void callback_m10_timer_sign( TimerHandle_t xTimer ){
                 {SEC_ECSIGN[10+i] = hash[i];};
         SEC_ECSIGN[8] = count_uart_mes_for_sha256;
         count_uart_mes_for_sha256 = 0;
-        
+
         CRC_gen(SEC_ECSIGN, sizeof(SEC_ECSIGN));
-        uart_write_blocking(uart0, SEC_ECSIGN, sizeof(SEC_ECSIGN));
+        if (xSemaphoreTake(uart_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                uart_write_blocking(uart0, SEC_ECSIGN, sizeof(SEC_ECSIGN));
+                xSemaphoreGive(uart_mutex);
+        }
         sha256_cleanup();
         sha256_init();
 }
 void callback_m10_timer_nav( TimerHandle_t xTimer ){
         flag++;
         secunda();
-        if (s0a38) {uart_write_blocking(uart0, UBX_MON_RF, sizeof(UBX_MON_RF)); count_uart_mes_for_sha256++;
-                sha256_update(UBX_MON_RF, sizeof(UBX_MON_RF));};
-        if (s0107) {uart_write_blocking(uart0, UBX_NAV_PVT, sizeof(UBX_NAV_PVT)); count_uart_mes_for_sha256++;
-                sha256_update(UBX_NAV_PVT, sizeof(UBX_NAV_PVT));};
-        if (s0101) {uart_write_blocking(uart0, UBX_NAV_POSECEF, sizeof(UBX_NAV_POSECEF)); count_uart_mes_for_sha256++;
-                sha256_update(UBX_NAV_POSECEF, sizeof(UBX_NAV_POSECEF));};
-        if (s0102) {uart_write_blocking(uart0, UBX_NAV_POSLLH, sizeof(UBX_NAV_POSLLH)); count_uart_mes_for_sha256++;
-                sha256_update(UBX_NAV_POSLLH, sizeof(UBX_NAV_POSLLH));};
-        if (s0112) {uart_write_blocking(uart0, UBX_NAV_VELNED, sizeof(UBX_NAV_VELNED)); count_uart_mes_for_sha256++;
-                sha256_update(UBX_NAV_VELNED, sizeof(UBX_NAV_VELNED));};
-        if (s0135) {uart_write_blocking(uart0, UBX_NAV_SAT, sizeof(UBX_NAV_SAT)); count_uart_mes_for_sha256++;
-                sha256_update(UBX_NAV_SAT, sizeof(UBX_NAV_SAT));};
-        if (s0103) {uart_write_blocking(uart0, UBX_NAV_STATUS, sizeof(UBX_NAV_STATUS)); count_uart_mes_for_sha256++;
-                sha256_update(UBX_NAV_STATUS, sizeof(UBX_NAV_STATUS));};
-        if (s0104) {uart_write_blocking(uart0, UBX_NAV_DOP, sizeof(UBX_NAV_DOP)); count_uart_mes_for_sha256++;
-                sha256_update(UBX_NAV_DOP, sizeof(UBX_NAV_DOP));};
-        if (s0121) {uart_write_blocking(uart0, UBX_NAV_TIMEUTC, sizeof(UBX_NAV_TIMEUTC)); count_uart_mes_for_sha256++;
-                sha256_update(UBX_NAV_TIMEUTC, sizeof(UBX_NAV_TIMEUTC));};
-        if (s0122) {uart_write_blocking(uart0, UBX_NAV_CLOCK, sizeof(UBX_NAV_CLOCK)); count_uart_mes_for_sha256++;
-                sha256_update(UBX_NAV_CLOCK, sizeof(UBX_NAV_CLOCK));};
-        if (s0160) {uart_write_blocking(uart0, UBX_NAV_AOPSTATUS, sizeof(UBX_NAV_AOPSTATUS)); count_uart_mes_for_sha256++;
-                sha256_update(UBX_NAV_AOPSTATUS, sizeof(UBX_NAV_AOPSTATUS));};
-        if (s0d01) {uart_write_blocking(uart0, Timepulse, sizeof(Timepulse)); count_uart_mes_for_sha256++;
-                sha256_update(Timepulse, sizeof(Timepulse));};
+
+        // Take mutex for UART access
+        if (xSemaphoreTake(uart_mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+                if (s0a38) {uart_write_blocking(uart0, UBX_MON_RF, sizeof(UBX_MON_RF)); count_uart_mes_for_sha256++;
+                        sha256_update(UBX_MON_RF, sizeof(UBX_MON_RF));};
+                if (s0107) {uart_write_blocking(uart0, UBX_NAV_PVT, sizeof(UBX_NAV_PVT)); count_uart_mes_for_sha256++;
+                        sha256_update(UBX_NAV_PVT, sizeof(UBX_NAV_PVT));};
+                if (s0101) {uart_write_blocking(uart0, UBX_NAV_POSECEF, sizeof(UBX_NAV_POSECEF)); count_uart_mes_for_sha256++;
+                        sha256_update(UBX_NAV_POSECEF, sizeof(UBX_NAV_POSECEF));};
+                if (s0102) {uart_write_blocking(uart0, UBX_NAV_POSLLH, sizeof(UBX_NAV_POSLLH)); count_uart_mes_for_sha256++;
+                        sha256_update(UBX_NAV_POSLLH, sizeof(UBX_NAV_POSLLH));};
+                if (s0112) {uart_write_blocking(uart0, UBX_NAV_VELNED, sizeof(UBX_NAV_VELNED)); count_uart_mes_for_sha256++;
+                        sha256_update(UBX_NAV_VELNED, sizeof(UBX_NAV_VELNED));};
+                if (s0135) {uart_write_blocking(uart0, UBX_NAV_SAT, sizeof(UBX_NAV_SAT)); count_uart_mes_for_sha256++;
+                        sha256_update(UBX_NAV_SAT, sizeof(UBX_NAV_SAT));};
+                if (s0103) {uart_write_blocking(uart0, UBX_NAV_STATUS, sizeof(UBX_NAV_STATUS)); count_uart_mes_for_sha256++;
+                        sha256_update(UBX_NAV_STATUS, sizeof(UBX_NAV_STATUS));};
+                if (s0104) {uart_write_blocking(uart0, UBX_NAV_DOP, sizeof(UBX_NAV_DOP)); count_uart_mes_for_sha256++;
+                        sha256_update(UBX_NAV_DOP, sizeof(UBX_NAV_DOP));};
+                if (s0121) {uart_write_blocking(uart0, UBX_NAV_TIMEUTC, sizeof(UBX_NAV_TIMEUTC)); count_uart_mes_for_sha256++;
+                        sha256_update(UBX_NAV_TIMEUTC, sizeof(UBX_NAV_TIMEUTC));};
+                if (s0122) {uart_write_blocking(uart0, UBX_NAV_CLOCK, sizeof(UBX_NAV_CLOCK)); count_uart_mes_for_sha256++;
+                        sha256_update(UBX_NAV_CLOCK, sizeof(UBX_NAV_CLOCK));};
+                if (s0160) {uart_write_blocking(uart0, UBX_NAV_AOPSTATUS, sizeof(UBX_NAV_AOPSTATUS)); count_uart_mes_for_sha256++;
+                        sha256_update(UBX_NAV_AOPSTATUS, sizeof(UBX_NAV_AOPSTATUS));};
+                if (s0d01) {uart_write_blocking(uart0, Timepulse, sizeof(Timepulse)); count_uart_mes_for_sha256++;
+                        sha256_update(Timepulse, sizeof(Timepulse));};
+                xSemaphoreGive(uart_mutex);
+        }
         flag--;
 }
 /* Обработка нажатия кнопки здесь*/
@@ -271,36 +292,50 @@ void gpio_6_on(void) {
 }
 */
 
+// ISR for button press - just signals the task
 void gpio_6_on() {
-        gpio_put(5, 0);
+        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+        xSemaphoreGiveFromISR(gpio_button_sem, &xHigherPriorityTaskWoken);
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+}
+
+// Task to handle button press with flash operations
+void gpio_button_task(void *pvParameters) {
         PIO pio_sk = pio2;
         uint sm_sk = sm2;
-        busy_wait_ms(200);
-        
-       
 
-        if (flag_gpio6 == 1){
-                r = 0, g = 0, b = 100;
-                off_uart0();
-                gpio_set_function(0, PIO_FUNCSEL_NUM(pio2,0));
-                pio_sm_set_enabled(pio_sk, sm_sk, true);
-                flag_gpio6 = 0;
-                        program_erase(params);
-                      //  flash_safe_execute(program_erase, params, UINT32_MAX);
-                        data[3] = r; data[2] = g; data[1] = b; data[0] = regim = 1;
-                        program_flash(params);
-                       // flash_safe_execute(program_flash, params, UINT32_MAX);*/
-        } else {
-                r = 0, g = 100, b = 0;
-                pio_sm_set_enabled(pio_sk, sm_sk, false);
-                flag_gpio6 = 1;
-                setup_uart0();
-                        program_erase(params);
-                        data[3] = r; data[2] = g; data[1] = b; data[0] = regim = 0;
-                        program_flash(params);//*/
-        } 
-       gpio_put(5, 1);
-        
+        for(;;) {
+                // Wait for button press signal
+                if (xSemaphoreTake(gpio_button_sem, portMAX_DELAY) == pdTRUE) {
+                        // Debounce delay
+                        vTaskDelay(pdMS_TO_TICKS(200));
+
+                        gpio_put(5, 0);
+
+                        if (flag_gpio6 == 1) {
+                                r = 0; g = 0; b = 100;
+                                off_uart0();
+                                gpio_set_function(0, PIO_FUNCSEL_NUM(pio2,0));
+                                pio_sm_set_enabled(pio_sk, sm_sk, true);
+                                flag_gpio6 = 0;
+
+                                program_erase(params);
+                                data[3] = r; data[2] = g; data[1] = b; data[0] = regim = 1;
+                                program_flash(params);
+                        } else {
+                                r = 0; g = 100; b = 0;
+                                pio_sm_set_enabled(pio_sk, sm_sk, false);
+                                flag_gpio6 = 1;
+                                setup_uart0();
+
+                                program_erase(params);
+                                data[3] = r; data[2] = g; data[1] = b; data[0] = regim = 0;
+                                program_flash(params);
+                        }
+
+                        gpio_put(5, 1);
+                }
+        }
 }
 
 /* Светодиод моргает здесь*/
@@ -403,7 +438,16 @@ int main() {
                 flag_gpio6 = 0;
         }
         
-        TaskHandle_t Led_handle, sec_task;
+        TaskHandle_t Led_handle, sec_task, button_task;
+
+        // Create semaphore for button handler
+        gpio_button_sem = xSemaphoreCreateBinary();
+        configASSERT(gpio_button_sem != NULL);
+
+        // Create mutex for UART access protection
+        uart_mutex = xSemaphoreCreateMutex();
+        configASSERT(uart_mutex != NULL);
+
         MeasRateTimer = xTimerCreate("MeasRateTimer", Timer_1hz, pdTRUE, 0, callback_1hz);
         NavRateTimer = xTimerCreate("NavRateTimer", Timer_10hz, pdTRUE, 0, callback_10hz);
         m10_timer_meas = xTimerCreate("m10_timer_meas", Timer_10hz, pdTRUE, 0, callback_m10_timer_meas);
@@ -412,6 +456,7 @@ int main() {
         timer_15sec = xTimerCreate("Таймер подмены на 15 сек", Timer_15_sec, pdFALSE, 0, disable_15sec);
         xTaskCreate( Led_green_blink, "Мигание", 256, NULL, 1, &Led_handle);
         xTaskCreate( SecundaTaskCRC, "Считаем секунду", 512, NULL, 5, &sec_task);
+        xTaskCreate( gpio_button_task, "Обработка кнопки", 512, NULL, 3, &button_task);
         
         sha256_init();              // Инициализация контекста
         //ctx = EVP_MD_CTX_new();                                        
@@ -433,8 +478,14 @@ void on_uart_rx0() {
 
         while(uart_is_readable_within_us(uart0, 300) == true) {
         uint8_t bait = uart_getc(uart0);
-        RxData[count] = bait;
-        count++;
+        if (count < sizeof(RxData)) {
+                RxData[count] = bait;
+                count++;
+        } else {
+                // Buffer overflow - reset counter
+                count = 0;
+                break;
+        }
         }
         
         if (flag == 0 && count != 0 && RxData[2] == 0x0A && RxData[3] == 0x04) {     //monitor_ver

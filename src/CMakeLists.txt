@@ -18,14 +18,11 @@ target_sources(podmena PRIVATE main.c)
 # Указание файла memory.x
 set(PICO_TARGET_LINKER_FILE "${CMAKE_SOURCE_DIR}/memory.x")
 
-set(OPENSSL_ROOT_DIR "m:/rp2040-freertos-template-main_/src/OSSL") # Корневая директория OpenSSL
-
-set(SSL "c:/OpenSSL-MinGW/lib64/libssl.a")
-set(Crypto "c:/OpenSSL-MinGW/lib64/libcrypto.a")
-
-set(mbedtls "m:/rp2040-freertos-template-main_/src/mbedtls/library/libmbedtls.a")
-set(mbedcrypto "m:/rp2040-freertos-template-main_/src/mbedtls/library/libmbedcrypto.a")
-set(mbedx509 "m:/rp2040-freertos-template-main_/src/mbedtls/library/libmbedx509.a")
+set(SSL "${CMAKE_CURRENT_LIST_DIR}/OSSL/lib/libssl.a")
+set(Crypto "${CMAKE_CURRENT_LIST_DIR}/OSSL/lib/libcrypto.a")
+# set(mbedtls "${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/libmbedtls.a")
+# set(mbedcrypto "${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/libmbedcrypto.a")
+# set(mbedx509 "${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/libmbedx509.a")
 
 
 target_link_libraries(podmena 
@@ -45,7 +42,6 @@ PUBLIC  pico_stdlib
     )
 
 pico_add_extra_outputs(podmena)
-
 
 
 
