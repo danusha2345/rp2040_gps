@@ -1,106 +1,272 @@
 # u-blox GNSS Emulator
 
-Unified firmware for RP2040 (Pico) and RP2350 (Pico 2) that emulates u-blox GNSS receiver.
+Унифицированная прошивка для RP2040 (Raspberry Pi Pico) и RP2350 (Raspberry Pi Pico 2), эмулирующая приёмники u-blox GNSS M8 и M10 с полной поддержкой UBX протокола и криптографической подписи SEC-SIGN.
 
-## Features
+## Возможности
 
-- **UBX Protocol Support:**
-  - UBX-NAV-PVT (Position, Velocity, Time) - 10Hz configurable
-  - UBX-NAV-SVINFO (Satellite Information) - 1Hz configurable
-  - UBX-NAV-POSLLH (Position LLH)
-  - UBX-NAV-POSECEF (Position ECEF)
-  - UBX-MON-HW (Hardware Status)
-  - UBX-MON-VER (Version - emulates M8 or M10)
-  - UBX-TIM-TP (Timepulse)
+### Поддержка UBX протокола
 
-- **Dynamic Configuration:**
-  - Baudrate switching (9600, 115200, 460800)
-  - Message rate configuration
-  - Enable/disable individual messages
+**Навигационные сообщения (NAV):**
+- `UBX-NAV-PVT` (Position Velocity Time) - основное сообщение, 5 Hz
+- `UBX-NAV-POSECEF` (Position ECEF) - координаты в ECEF
+- `UBX-NAV-POSLLH` (Position LLH) - координаты широта/долгота/высота
+- `UBX-NAV-STATUS` - статус навигации
+- `UBX-NAV-DOP` (Dilution of Precision) - точность позиционирования
+- `UBX-NAV-VELNED` - скорость в NED координатах
+- `UBX-NAV-TIMEUTC` - время UTC
+- `UBX-NAV-CLOCK` - синхронизация часов
+- `UBX-NAV-SAT` - информация о спутниках (M10)
+- `UBX-NAV-SVINFO` - информация о спутниках (M8, устаревшее)
+- `UBX-NAV-AOPSTATUS` - статус AssistNow Autonomous
 
-- **Two Operation Modes:**
-  - **Emulation Mode** (Green LED): Generates fake GNSS data
-  - **Passthrough Mode** (Blue LED): Transparent UART bridge via PIO
+**Сообщения приёмника (RXM):**
+- `UBX-RXM-RAWX` - сырые измерения GNSS
 
-## Hardware
+**Мониторинг (MON):**
+- `UBX-MON-VER` - версия прошивки (эмуляция M8 или M10)
+- `UBX-MON-HW` - статус аппаратуры
+- `UBX-MON-COMMS` - статус коммуникаций
 
-### Pin Configuration
+**Время (TIM):**
+- `UBX-TIM-TP` - сообщение временного импульса
 
-| Pin | Function |
+**Безопасность (SEC):**
+- `UBX-SEC-SIGN` - ECDSA подпись (SECP192R1) для аутентификации данных
+- `UBX-SEC-UNIQID` - уникальный ID чипа
+
+### Конфигурационные команды (CFG)
+
+Эмулятор поддерживает следующие UBX-CFG команды:
+
+| Команда | Class | ID | Описание |
+|---------|-------|-----|----------|
+| `CFG-PRT` | 0x06 | 0x00 | Настройка порта и скорости UART (9600, 115200, 460800) |
+| `CFG-RATE` | 0x06 | 0x08 | Настройка частоты навигационных сообщений |
+| `CFG-MSG` | 0x06 | 0x01 | Включение/отключение отдельных сообщений |
+| `CFG-NAV5` | 0x06 | 0x24 | Настройки навигационного движка |
+| `CFG-NAVX5` | 0x06 | 0x23 | Расширенные навигационные настройки |
+| `CFG-GNSS` | 0x06 | 0x3E | Конфигурация GNSS систем |
+| `CFG-PMS` | 0x06 | 0x86 | Управление энергопотреблением |
+| `CFG-CFG` | 0x06 | 0x09 | Сохранение/загрузка/сброс конфигурации |
+| `CFG-VALSET` | 0x06 | 0x8A | Установка значений конфигурации (M10) |
+
+### Криптографическая подпись SEC-SIGN
+
+Эмулятор реализует функцию SEC-SIGN для аутентификации потока данных GNSS:
+- **Алгоритм:** ECDSA на эллиптической кривой SECP192R1
+- **Хеширование:** SHA-256
+- **Периодичность:** первое сообщение через 3 секунды, затем каждые 4 секунды
+- **Накопление:** все отправленные UBX сообщения хешируются для создания подписи
+- **Библиотека:** micro-ecc для криптографических операций
+
+### Два режима работы
+
+1. **Режим эмуляции** (зелёный LED):
+   - Генерирует поток UBX сообщений
+   - Динамически обновляет iTOW (время недели GPS)
+   - Симулирует время и координаты
+   - Поддерживает все UBX-CFG команды
+   - Отправляет SEC-SIGN подписи
+
+2. **Режим прозрачного моста** (синий LED):
+   - Прозрачная передача UART через PIO
+   - Минимальная задержка
+   - Используется для подключения реального GNSS приёмника
+
+### Динамическая конфигурация
+
+Эмулятор поддерживает динамическую настройку во время работы:
+
+- **Переключение скорости UART:**
+  - 9600 бод
+  - 115200 бод (по умолчанию)
+  - 460800 бод
+  - Изменяется через команду `UBX-CFG-PRT`
+
+- **Настройка частоты сообщений:**
+  - Конфигурируемая частота обновления навигации
+  - Индивидуальная настройка периода для каждого типа сообщений
+  - Изменяется через команды `UBX-CFG-RATE` и `UBX-CFG-MSG`
+
+- **Управление выводом сообщений:**
+  - Включение/отключение любого UBX сообщения
+  - Настройка вывода на каждый порт отдельно
+  - По умолчанию все сообщения отключены
+  - Изменяется через команду `UBX-CFG-MSG`
+
+## Аппаратная конфигурация
+
+### Назначение пинов
+
+| Пин | Функция |
 |-----|----------|
-| GP0 | UART TX |
-| GP1 | UART RX |
-| GP3 | PIO Passthrough Input |
-| GP5 | Mode Button Power |
-| GP6 | Mode Button Input |
-| GP16 | WS2812 LED |
+| GP0 | UART TX (передача в хост) |
+| GP1 | UART RX (приём от хоста) |
+| GP3 | PIO Passthrough Input (вход от реального GNSS) |
+| GP5 | Mode Button Power (питание кнопки) |
+| GP6 | Mode Button Input (вход кнопки режима) |
+| GP16 | WS2812 LED (RGB индикатор) |
 
-### Architecture Differences
+### Архитектура двух ядер
 
-| Feature | RP2040 | RP2350 |
-|---------|--------|--------|
-| Cores used | Single-core | Dual-core |
-| LED control | FreeRTOS task | Core1 alarm pool |
-| GPIO IRQ | Core0 | Core1 |
-| CRC calculation | Core0 | Core1 |
+Оба варианта (RP2040 и RP2350) используют идентичную двухядерную архитектуру:
 
-## Building
+| Ядро | Задачи |
+|------|--------|
+| **Core0** | FreeRTOS scheduler, UART IRQ, таймеры (1Hz/5Hz), передача UBX сообщений, отправка SEC-SIGN |
+| **Core1** | LED blink (alarm pool), GPIO кнопка, начальный CRC, вычисление SEC-SIGN (SHA256 + ECDSA) |
 
-### Prerequisites
+**Межъядерное взаимодействие SEC-SIGN:**
+```
+Core0 (таймер 4с) → sec_sign_request = true
+Core1 (main loop) → вычисление SHA256 + ECDSA → sec_sign_ready = true
+Core0 (1Hz)       → uart_write_blocking(SEC-SIGN)
+```
 
-- Pico SDK 2.x installed
+## Сборка проекта
+
+### Требования
+
+- Pico SDK 2.x
 - CMake 3.13+
 - ARM GCC toolchain
+- FreeRTOS (включён в проект)
+- micro-ecc (включён в проект)
 
-### Build Commands
+### Команды сборки
 
 ```bash
-# Create build directory
+# Создать директорию сборки
 mkdir build && cd build
 
-# For RP2040 (Raspberry Pi Pico)
+# Для RP2040 (Raspberry Pi Pico)
 cmake -DTARGET_BOARD=pico ..
 make -j4
 
-# For RP2350 (Raspberry Pi Pico 2)
+# Для RP2350 (Raspberry Pi Pico 2)
 cmake -DTARGET_BOARD=pico2 ..
 make -j4
 ```
 
-### Output Files
+### Выходные файлы
 
-- `ublox_fake_rp2040.uf2` - For Raspberry Pi Pico
-- `ublox_fake_rp2350.uf2` - For Raspberry Pi Pico 2
+После сборки будут созданы:
+- `ublox_fake_rp2040.uf2` - прошивка для Raspberry Pi Pico
+- `ublox_fake_rp2350.uf2` - прошивка для Raspberry Pi Pico 2
 
-## Usage
+## Использование
 
-1. Flash the `.uf2` file to your Pico/Pico2
-2. Connect UART to your host device
-3. Green LED = Emulation mode (default)
-4. Press mode button to toggle Passthrough mode (Blue LED)
+### Прошивка устройства
 
-### Supported UBX Commands
+1. Подключите Pico/Pico2 к компьютеру с зажатой кнопкой BOOTSEL
+2. Скопируйте соответствующий `.uf2` файл на появившийся USB накопитель
+3. Устройство автоматически перезагрузится и начнёт работу
 
-| Command | Class | ID | Description |
-|---------|-------|-----|-------------|
-| MON-VER | 0x0A | 0x04 | Poll version |
-| CFG-PRT | 0x06 | 0x00 | Configure port/baudrate |
-| CFG-RATE | 0x06 | 0x08 | Set navigation rate |
-| CFG-MSG | 0x06 | 0x01 | Enable/disable messages |
-| CFG-NAV5 | 0x06 | 0x24 | Navigation settings |
-| CFG-NAVX5 | 0x06 | 0x23 | Extended navigation |
-| CFG-GNSS | 0x06 | 0x3E | GNSS configuration |
-| CFG-PMS | 0x06 | 0x86 | Power management |
-| CFG-CFG | 0x06 | 0x09 | Save/Load/Clear config |
+### Подключение
 
-## LED Status
+1. Подключите UART к вашему хост-устройству (GP0 - TX, GP1 - RX)
+2. Установите скорость 115200 бод (по умолчанию)
+3. Зелёный LED = режим эмуляции (по умолчанию)
+4. Нажмите кнопку режима для переключения в режим моста (синий LED)
 
-| Color | State | Meaning |
+### Индикация LED
+
+| Цвет | Состояние | Значение |
 |-------|-------|---------|
-| Green | Blinking | Emulation mode active |
-| Blue | Blinking | Passthrough mode active |
-| Red | Solid | Stack overflow error |
+| Зелёный | Мигающий | Режим эмуляции активен |
+| Синий | Мигающий | Режим прозрачного моста активен |
+| Красный | Постоянный | Ошибка переполнения стека FreeRTOS |
 
-## License
+### Настройка сообщений
 
-Based on FreeRTOS (MIT License)
+По умолчанию все сообщения отключены. Для включения нужных сообщений используйте команды `UBX-CFG-MSG`:
+
+```
+# Пример включения UBX-NAV-PVT на порту 1 (UART)
+B5 62 06 01 03 00 01 07 01 [CRC]
+# Class=0x01, ID=0x07 (NAV-PVT), Rate=1
+```
+
+### Эмулируемые версии
+
+**Режим M8 (по умолчанию):**
+- ROM CORE 3.01 (107888)
+- PROTVER=18.00
+- Поддерживаемые системы: GPS, GLONASS, Galileo, BeiDou, SBAS, IMES, QZSS
+
+**Режим M10:**
+- ROM SPG 5.10 (7b202e)
+- PROTVER=34.10
+- Поддерживаемые системы: GPS, GLONASS, Galileo, BeiDou, SBAS, QZSS
+- Поддержка `UBX-CFG-VALSET`, `UBX-NAV-SAT`, `UBX-SEC-SIGN`
+
+## Технические особенности
+
+### FreeRTOS таймеры (Core0)
+
+- **Timer_5Hz:** генерация NAV сообщений (PVT, POSECEF, POSLLH, STATUS, DOP, VELNED, TIMEUTC, CLOCK, SAT, AOPSTATUS, RXM-RAWX) - 200 мс
+- **Timer_1Hz:** генерация MON сообщений (COMMS, HW, SVINFO) + проверка SEC-SIGN ready - 1000 мс
+- **Timer_3sec:** первый SEC-SIGN запрос (one-shot)
+- **Timer_4sec:** периодический SEC-SIGN запрос
+- **Timer_msg_start:** задержка 1 сек после первого CFG-MSG (one-shot)
+
+**UART IRQ:** приём и обработка UBX команд от хоста
+
+### SEC-SIGN процесс
+
+1. **Core0:** Все отправленные UBX сообщения накапливаются в SHA256 контекст (`sec_sign_accumulate`)
+2. **Core0:** Каждые 4 секунды таймер устанавливает `sec_sign_request = true`
+3. **Core1:** В главном цикле видит запрос и выполняет:
+   - Вычисление SHA256 хеша накопленных данных
+   - Подпись приватным ключом ECDSA (SECP192R1) — тяжёлая операция ~5-10мс
+   - Установка `sec_sign_ready = true`
+4. **Core0:** В callback_1hz проверяет флаг ready и отправляет `UBX-SEC-SIGN`
+
+### Управление скоростью UART
+
+Поддерживаемые скорости:
+- 9600 бод
+- 115200 бод (по умолчанию)
+- 460800 бод
+
+Переключение выполняется через команду `UBX-CFG-PRT`.
+
+## Структура проекта
+
+```
+ublox_fake_unified/
+├── CMakeLists.txt           # Конфигурация сборки
+├── README.md                # Эта документация
+├── pico_sdk_import.cmake    # Импорт Pico SDK
+├── src/
+│   ├── main_rp2040.c        # Основной код для RP2040
+│   ├── main_rp2350.c        # Основной код для RP2350
+│   ├── massivs.h            # UBX сообщения и данные
+│   ├── FreeRTOSConfig.h     # Конфигурация FreeRTOS
+│   ├── sha256.c/h           # SHA-256 хеширование
+│   ├── ws2812.pio           # PIO программа для RGB LED
+│   └── uart_rx.pio          # PIO программа для UART passthrough
+├── lib/
+│   └── micro-ecc/           # Библиотека ECDSA криптографии
+└── FreeRTOS/                # FreeRTOS ядро
+```
+
+## Лицензия
+
+Проект основан на FreeRTOS (лицензия MIT).
+
+Использованные библиотеки:
+- **FreeRTOS Kernel** - MIT License
+- **micro-ecc** - BSD License
+- **Pico SDK** - BSD 3-Clause License
+
+## Автор
+
+Разработано Daniil, 2025
+
+## Примечания
+
+- Эмулятор не использует реальные GPS координаты - все данные симулируются
+- SEC-SIGN подпись валидна и может быть проверена соответствующим публичным ключом
+- Координаты по умолчанию: 55.761199°N, 37.618423°E (Москва, Красная площадь)
+- Время и дата обновляются автоматически на основе iTOW
