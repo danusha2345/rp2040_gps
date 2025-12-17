@@ -384,9 +384,21 @@ void on_uart_rx0(void) {
             UBX_NAV_SVINFO_fl = true;
             xTimerChangePeriod(TTimer_1hz, pdMS_TO_TICKS(1000 / RxData[8]), 0);
         }
-        // MON-HW enable
+        // MON-HW enable (class 0x0A, id 0x09)
         if (RxData[6] == 0x0A && RxData[7] == 0x09 && RxData[8] > 0) {
             UBX_MON_HW_fl = true;
+        }
+        // NAV-POSLLH enable (class 0x01, id 0x02)
+        if (RxData[6] == 0x01 && RxData[7] == 0x02 && RxData[8] > 0) {
+            UBX_NAV_POSLLH_fl = true;
+        }
+        // NAV-POSECEF enable (class 0x01, id 0x01)
+        if (RxData[6] == 0x01 && RxData[7] == 0x01 && RxData[8] > 0) {
+            UBX_NAV_POSECEF_fl = true;
+        }
+        // TIM-TP enable (class 0x0D, id 0x01)
+        if (RxData[6] == 0x0D && RxData[7] == 0x01 && RxData[8] > 0) {
+            timepulse_fl = true;
         }
     }
 
