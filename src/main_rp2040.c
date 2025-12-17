@@ -4,7 +4,10 @@
  * @author Daniil
  * @date 2025
  *
- * Single-core FreeRTOS implementation with full UBX protocol support.
+ * Dual-core implementation:
+ * - Core0: FreeRTOS scheduler, UART, message transmission
+ * - Core1: LED control, GPIO button, SEC-SIGN computation (SHA256 + ECDSA)
+ *
  * Features:
  * - UBX-NAV-PVT (10Hz configurable)
  * - UBX-NAV-SVINFO (1Hz configurable)
@@ -18,6 +21,7 @@
 #include <stdint.h>
 #include "pico/stdlib.h"
 #include "pico/time.h"
+#include "pico/multicore.h"
 #include "hardware/uart.h"
 #include "hardware/irq.h"
 #include "hardware/clocks.h"
@@ -98,14 +102,15 @@ volatile bool msg_output_started = false;
 // SEC-SIGN variables (always enabled, first at 3s, then every 4s)
 SHA256_CTX sec_sign_sha256_ctx;
 volatile uint16_t sec_sign_packet_count = 0;
+volatile bool sec_sign_request = false;  // Core0 -> Core1 signal
+volatile bool sec_sign_ready = false;    // Core1 -> Core0 signal
 
-// FreeRTOS handles
+// FreeRTOS handles (Core0)
 TimerHandle_t TTimer_10hz, TTimer_1hz, TTimer_first_sec_sign, TTimer_4sec, TTimer_msg_start;
-TaskHandle_t Led_handle;
 
 // PIO handles
 PIO pio_led, pio_passthrough;
-uint sm_led, sm_passthrough, offset_passthrough;
+uint sm_led, sm_passthrough, offset_led, offset_passthrough;
 
 // ============================================================================
 // Function prototypes
@@ -123,9 +128,11 @@ void callback_10hz(TimerHandle_t xTimer);
 void callback_first_sec_sign(TimerHandle_t xTimer);
 void callback_4sec(TimerHandle_t xTimer);
 void callback_msg_start(TimerHandle_t xTimer);
-void Led_blink_task(void *pvParameters);
 void sec_sign_accumulate(const uint8_t *msg, size_t len);
-void sec_sign_send(void);
+void sec_sign_compute(void);  // Core1: compute signature
+// Core1 functions
+void core1_entry(void);
+bool timer_callback(struct repeating_timer *t);
 
 // ============================================================================
 // WS2812 LED functions
@@ -245,8 +252,8 @@ void sec_sign_accumulate(const uint8_t *msg, size_t len) {
     sec_sign_packet_count++;
 }
 
-void sec_sign_send(void) {
-
+// Core1: Compute SEC-SIGN signature (heavy ECDSA operation)
+void sec_sign_compute(void) {
     // Get accumulated SHA256 hash
     uint8_t sha256_field[32];
     SHA256_CTX ctx_copy = sec_sign_sha256_ctx;
@@ -270,41 +277,29 @@ void sec_sign_send(void) {
         z_bytes[i] ^= final_hash[24 + i];
     }
 
-    // Sign using ECDSA SECP192R1
+    // Sign using ECDSA SECP192R1 (heavy operation ~5-10ms)
     uint8_t signature[48];  // R (24 bytes) + S (24 bytes)
     uECC_Curve curve = uECC_secp192r1();
 
-    // uECC_sign expects hash to be truncated to curve size (192 bits = 24 bytes)
     if (!uECC_sign(sec_sign_private_key, z_bytes, 24, signature, curve)) {
         return;  // Signing failed
     }
 
     // Build SEC-SIGN message
-    // Version (bytes 6-7)
     UBX_SEC_SIGN[6] = 0x01;
     UBX_SEC_SIGN[7] = 0x00;
-
-    // Packet count (bytes 8-9, little-endian)
     UBX_SEC_SIGN[8] = sec_sign_packet_count & 0xFF;
     UBX_SEC_SIGN[9] = (sec_sign_packet_count >> 8) & 0xFF;
-
-    // SHA256 field (bytes 10-41)
     memcpy(&UBX_SEC_SIGN[10], sha256_field, 32);
-
-    // SessionID (bytes 42-65)
     memcpy(&UBX_SEC_SIGN[42], sessionId, 24);
-
-    // R signature (bytes 66-89)
     memcpy(&UBX_SEC_SIGN[66], signature, 24);
-
-    // S signature (bytes 90-113)
     memcpy(&UBX_SEC_SIGN[90], signature + 24, 24);
 
     // Calculate checksum
     CRC_gen(UBX_SEC_SIGN, sizeof(UBX_SEC_SIGN));
 
-    // Send message
-    uart_write_blocking(uart0, UBX_SEC_SIGN, sizeof(UBX_SEC_SIGN));
+    // Signal Core0 that signature is ready
+    sec_sign_ready = true;
 
     // Reset for next interval
     sha256_init(&sec_sign_sha256_ctx);
@@ -363,6 +358,12 @@ void callback_1hz(TimerHandle_t xTimer) {
     if (UBX_MON_HW_fl) {
         uart_write_blocking(uart0, UBX_MON_HW, sizeof(UBX_MON_HW));
         sec_sign_accumulate(UBX_MON_HW, sizeof(UBX_MON_HW));
+    }
+
+    // Check if Core1 has computed SEC-SIGN signature
+    if (sec_sign_ready) {
+        sec_sign_ready = false;
+        uart_write_blocking(uart0, UBX_SEC_SIGN, sizeof(UBX_SEC_SIGN));
     }
 
     flag = !flag;
@@ -428,14 +429,15 @@ void callback_10hz(TimerHandle_t xTimer) {
 }
 
 void callback_first_sec_sign(TimerHandle_t xTimer) {
-    // First SEC-SIGN at 3 seconds after boot
-    sec_sign_send();
+    // Signal Core1 to compute first SEC-SIGN
+    sec_sign_request = true;
     // Start periodic 4-second timer for subsequent SEC-SIGN messages
     xTimerStart(TTimer_4sec, 0);
 }
 
 void callback_4sec(TimerHandle_t xTimer) {
-    sec_sign_send();
+    // Signal Core1 to compute SEC-SIGN
+    sec_sign_request = true;
 }
 
 void callback_msg_start(TimerHandle_t xTimer) {
@@ -444,15 +446,58 @@ void callback_msg_start(TimerHandle_t xTimer) {
 }
 
 // ============================================================================
-// LED blink task
+// Core1: LED blink timer callback
 // ============================================================================
 
-void Led_blink_task(void *pvParameters) {
-    for (;;) {
+bool timer_callback(struct repeating_timer *t) {
+    static bool led_state = false;
+    led_state = !led_state;
+    if (led_state) {
         put_pixel(pio_led, sm_led, urgb_u32(r, g, b));
-        vTaskDelay(pdMS_TO_TICKS(500));
+    } else {
         put_pixel(pio_led, sm_led, urgb_u32(0, 0, 0));
-        vTaskDelay(pdMS_TO_TICKS(500));
+    }
+    return true;
+}
+
+// ============================================================================
+// Core1 entry point - LED, GPIO, SEC-SIGN computation
+// ============================================================================
+
+void core1_entry(void) {
+    // Initialize WS2812 LED on PIO
+    pio_claim_free_sm_and_add_program_for_gpio_range(&ws2812_program, &pio_led,
+                                                      &sm_led, &offset_led, LED_PIN, 1, true);
+    ws2812_program_init(pio_led, sm_led, offset_led, LED_PIN, 800000, false);
+    put_pixel(pio_led, sm_led, urgb_u32(r, g, b));
+
+    // Create alarm pool for LED blink timer on Core1
+    struct repeating_timer timer;
+    alarm_pool_t *pool = alarm_pool_create(1, 10);
+    alarm_pool_add_repeating_timer_ms(pool, 500, timer_callback, NULL, &timer);
+
+    // Calculate initial CRC for all messages
+    CRC_gen(UBX_NAV_PVT, sizeof(UBX_NAV_PVT));
+    CRC_gen(UBX_NAV_SVINFO, sizeof(UBX_NAV_SVINFO));
+    CRC_gen(Timepulse, sizeof(Timepulse));
+    CRC_gen(UBX_NAV_POSECEF, sizeof(UBX_NAV_POSECEF));
+    CRC_gen(UBX_NAV_POSLLH, sizeof(UBX_NAV_POSLLH));
+
+    // Initialize mode button GPIO
+    gpio_init(MODE_BTN_PWR);
+    gpio_init(MODE_BTN_PIN);
+    gpio_set_dir(MODE_BTN_PWR, GPIO_OUT);
+    gpio_set_dir(MODE_BTN_PIN, GPIO_IN);
+    gpio_put(MODE_BTN_PWR, 1);
+    gpio_set_irq_enabled_with_callback(MODE_BTN_PIN, GPIO_IRQ_LEVEL_HIGH, true, &gpio_6_on);
+
+    // Core1 main loop - handle SEC-SIGN computation requests
+    while (1) {
+        if (sec_sign_request) {
+            sec_sign_request = false;
+            sec_sign_compute();  // Heavy ECDSA computation
+        }
+        tight_loop_contents();
     }
 }
 
@@ -684,40 +729,21 @@ void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName) {
 int main(void) {
     set_sys_clock_khz(150000, true);
 
-    // Initialize WS2812 LED on PIO
-    uint offset_led;
-    pio_claim_free_sm_and_add_program_for_gpio_range(&ws2812_program, &pio_led,
-                                                      &sm_led, &offset_led, LED_PIN, 1, true);
-    ws2812_program_init(pio_led, sm_led, offset_led, LED_PIN, 800000, false);
-    put_pixel(pio_led, sm_led, urgb_u32(r, g, b));
-
-    // Initialize PIO passthrough program
+    // Initialize PIO passthrough program (Core0)
     offset_passthrough = pio_add_program(pio0, &uart_rx_mini_program);
     pio_passthrough = pio0;
     sm_passthrough = 3;
     uart_rx_mini_program_init(pio_passthrough, sm_passthrough, offset_passthrough,
                                PIO_IN_PIN, PIO_OUT_PIN, 1000000);
 
-    // Initialize mode button GPIO
-    gpio_init(MODE_BTN_PWR);
-    gpio_init(MODE_BTN_PIN);
-    gpio_set_dir(MODE_BTN_PWR, GPIO_OUT);
-    gpio_set_dir(MODE_BTN_PIN, GPIO_IN);
-    gpio_put(MODE_BTN_PWR, 1);
-    gpio_set_irq_enabled_with_callback(MODE_BTN_PIN, GPIO_IRQ_LEVEL_HIGH, true, &gpio_6_on);
-
-    // Initialize UART
+    // Initialize UART (Core0)
     setup_uart0();
 
-    // Calculate initial CRC for all messages
-    CRC_gen(UBX_NAV_PVT, sizeof(UBX_NAV_PVT));
-    CRC_gen(UBX_NAV_SVINFO, sizeof(UBX_NAV_SVINFO));
-    CRC_gen(Timepulse, sizeof(Timepulse));
-    CRC_gen(UBX_NAV_POSECEF, sizeof(UBX_NAV_POSECEF));
-    CRC_gen(UBX_NAV_POSLLH, sizeof(UBX_NAV_POSLLH));
-
-    // Initialize SEC-SIGN (always enabled, first at 3s, then every 4s)
+    // Initialize SEC-SIGN (first at 3s, then every 4s)
     sha256_init(&sec_sign_sha256_ctx);
+
+    // Launch Core1 for LED, GPIO button, CRC, SEC-SIGN computation
+    multicore_launch_core1(core1_entry);
 
     // Create FreeRTOS timers
     TTimer_1hz = xTimerCreate("1Hz", Timer_1hz, pdTRUE, 0, callback_1hz);
@@ -728,9 +754,6 @@ int main(void) {
     TTimer_4sec = xTimerCreate("4sec", Timer_4sec, pdTRUE, 0, callback_4sec);
     // One-shot timer for message output start (1 second after first CFG-MSG)
     TTimer_msg_start = xTimerCreate("MsgStart", pdMS_TO_TICKS(1000), pdFALSE, 0, callback_msg_start);
-
-    // Create LED blink task
-    xTaskCreate(Led_blink_task, "LED", configMINIMAL_STACK_SIZE, NULL, 1, &Led_handle);
 
     // Start timers
     xTimerStart(TTimer_1hz, 0);
