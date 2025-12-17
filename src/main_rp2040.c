@@ -72,13 +72,25 @@ volatile int otvet = 0;
 volatile bool flag = 0;
 volatile bool flag_gpio6 = 1;
 
-// Message enable flags
-volatile bool UBX_NAV_PVT_fl = false;
-volatile bool UBX_NAV_SVINFO_fl = false;
-volatile bool timepulse_fl = false;
-volatile bool UBX_NAV_POSLLH_fl = false;
-volatile bool UBX_NAV_POSECEF_fl = false;
-volatile bool UBX_MON_HW_fl = false;
+// Message enable flags (matching real M10 device behavior)
+// 5Hz messages (NAV-*)
+volatile bool UBX_NAV_PVT_fl = true;       // NAV-PVT always on
+volatile bool UBX_NAV_POSECEF_fl = true;   // NAV-POSECEF
+volatile bool UBX_NAV_POSLLH_fl = true;    // NAV-POSLLH
+volatile bool UBX_NAV_STATUS_fl = true;    // NAV-STATUS
+volatile bool UBX_NAV_DOP_fl = true;       // NAV-DOP
+volatile bool UBX_NAV_VELNED_fl = true;    // NAV-VELNED
+volatile bool UBX_NAV_TIMEUTC_fl = true;   // NAV-TIMEUTC
+volatile bool UBX_NAV_CLOCK_fl = true;     // NAV-CLOCK
+volatile bool UBX_NAV_SAT_fl = true;       // NAV-SAT
+volatile bool UBX_NAV_AOPSTATUS_fl = true; // NAV-AOPSTATUS
+volatile bool UBX_RXM_RAWX_fl = true;      // RXM-RAWX
+// 1Hz messages (MON-*)
+volatile bool UBX_MON_COMMS_fl = true;     // MON-COMMS
+// Legacy (disabled by default)
+volatile bool UBX_NAV_SVINFO_fl = false;   // NAV-SVINFO (old, use NAV-SAT)
+volatile bool UBX_MON_HW_fl = false;       // MON-HW (old)
+volatile bool timepulse_fl = false;        // TIM-TP (not in M10 log)
 
 // SEC-SIGN variables (always enabled, first at 3s, then every 4s)
 SHA256_CTX sec_sign_sha256_ctx;
@@ -143,33 +155,63 @@ void CRC_gen(uint8_t *adr, int razmer) {
 // ============================================================================
 
 void secunda(void) {
-    // Update iTOW (ms of week) - increment by 100ms
+    // Update iTOW (ms of week) - increment by 200ms (5Hz)
     uint32_t val = UBX_NAV_PVT[9] << 24 | UBX_NAV_PVT[8] << 16 |
                    UBX_NAV_PVT[7] << 8 | UBX_NAV_PVT[6];
-    val = val + 100;
+    val = val + 200;
 
-    // Update all messages with same iTOW
+    // Update iTOW in all NAV messages
     UBX_NAV_PVT[6] = val; UBX_NAV_PVT[7] = val >> 8;
     UBX_NAV_PVT[8] = val >> 16; UBX_NAV_PVT[9] = val >> 24;
 
-    UBX_NAV_SVINFO[6] = UBX_NAV_PVT[6]; UBX_NAV_SVINFO[7] = UBX_NAV_PVT[7];
-    UBX_NAV_SVINFO[8] = UBX_NAV_PVT[8]; UBX_NAV_SVINFO[9] = UBX_NAV_PVT[9];
+    UBX_NAV_POSECEF[6] = val; UBX_NAV_POSECEF[7] = val >> 8;
+    UBX_NAV_POSECEF[8] = val >> 16; UBX_NAV_POSECEF[9] = val >> 24;
 
-    Timepulse[6] = UBX_NAV_PVT[6]; Timepulse[7] = UBX_NAV_PVT[7];
-    Timepulse[8] = UBX_NAV_PVT[8]; Timepulse[9] = UBX_NAV_PVT[9];
+    UBX_NAV_POSLLH[6] = val; UBX_NAV_POSLLH[7] = val >> 8;
+    UBX_NAV_POSLLH[8] = val >> 16; UBX_NAV_POSLLH[9] = val >> 24;
 
-    UBX_NAV_POSECEF[6] = UBX_NAV_PVT[6]; UBX_NAV_POSECEF[7] = UBX_NAV_PVT[7];
-    UBX_NAV_POSECEF[8] = UBX_NAV_PVT[8]; UBX_NAV_POSECEF[9] = UBX_NAV_PVT[9];
+    UBX_NAV_STATUS[6] = val; UBX_NAV_STATUS[7] = val >> 8;
+    UBX_NAV_STATUS[8] = val >> 16; UBX_NAV_STATUS[9] = val >> 24;
 
-    UBX_NAV_POSLLH[6] = UBX_NAV_PVT[6]; UBX_NAV_POSLLH[7] = UBX_NAV_PVT[7];
-    UBX_NAV_POSLLH[8] = UBX_NAV_PVT[8]; UBX_NAV_POSLLH[9] = UBX_NAV_PVT[9];
+    UBX_NAV_DOP[6] = val; UBX_NAV_DOP[7] = val >> 8;
+    UBX_NAV_DOP[8] = val >> 16; UBX_NAV_DOP[9] = val >> 24;
 
-    // Recalculate CRC for all updated messages
+    UBX_NAV_VELNED[6] = val; UBX_NAV_VELNED[7] = val >> 8;
+    UBX_NAV_VELNED[8] = val >> 16; UBX_NAV_VELNED[9] = val >> 24;
+
+    UBX_NAV_TIMEUTC[6] = val; UBX_NAV_TIMEUTC[7] = val >> 8;
+    UBX_NAV_TIMEUTC[8] = val >> 16; UBX_NAV_TIMEUTC[9] = val >> 24;
+
+    UBX_NAV_CLOCK[6] = val; UBX_NAV_CLOCK[7] = val >> 8;
+    UBX_NAV_CLOCK[8] = val >> 16; UBX_NAV_CLOCK[9] = val >> 24;
+
+    UBX_NAV_SAT[6] = val; UBX_NAV_SAT[7] = val >> 8;
+    UBX_NAV_SAT[8] = val >> 16; UBX_NAV_SAT[9] = val >> 24;
+
+    UBX_NAV_AOPSTATUS[6] = val; UBX_NAV_AOPSTATUS[7] = val >> 8;
+    UBX_NAV_AOPSTATUS[8] = val >> 16; UBX_NAV_AOPSTATUS[9] = val >> 24;
+
+    // Legacy messages (if enabled)
+    UBX_NAV_SVINFO[6] = val; UBX_NAV_SVINFO[7] = val >> 8;
+    UBX_NAV_SVINFO[8] = val >> 16; UBX_NAV_SVINFO[9] = val >> 24;
+
+    Timepulse[6] = val; Timepulse[7] = val >> 8;
+    Timepulse[8] = val >> 16; Timepulse[9] = val >> 24;
+
+    // Recalculate CRC for all messages
     CRC_gen(UBX_NAV_PVT, sizeof(UBX_NAV_PVT));
-    CRC_gen(UBX_NAV_SVINFO, sizeof(UBX_NAV_SVINFO));
-    CRC_gen(Timepulse, sizeof(Timepulse));
     CRC_gen(UBX_NAV_POSECEF, sizeof(UBX_NAV_POSECEF));
     CRC_gen(UBX_NAV_POSLLH, sizeof(UBX_NAV_POSLLH));
+    CRC_gen(UBX_NAV_STATUS, sizeof(UBX_NAV_STATUS));
+    CRC_gen(UBX_NAV_DOP, sizeof(UBX_NAV_DOP));
+    CRC_gen(UBX_NAV_VELNED, sizeof(UBX_NAV_VELNED));
+    CRC_gen(UBX_NAV_TIMEUTC, sizeof(UBX_NAV_TIMEUTC));
+    CRC_gen(UBX_NAV_CLOCK, sizeof(UBX_NAV_CLOCK));
+    CRC_gen(UBX_NAV_SAT, sizeof(UBX_NAV_SAT));
+    CRC_gen(UBX_NAV_AOPSTATUS, sizeof(UBX_NAV_AOPSTATUS));
+    CRC_gen(UBX_RXM_RAWX, sizeof(UBX_RXM_RAWX));
+    CRC_gen(UBX_NAV_SVINFO, sizeof(UBX_NAV_SVINFO));
+    CRC_gen(Timepulse, sizeof(Timepulse));
 }
 
 void secunda2(void) {
@@ -294,6 +336,12 @@ void callback_1hz(TimerHandle_t xTimer) {
     flag = !flag;
     secunda2();
 
+    // MON-* messages at 1Hz
+    if (UBX_MON_COMMS_fl) {
+        uart_write_blocking(uart0, UBX_MON_COMMS, sizeof(UBX_MON_COMMS));
+        sec_sign_accumulate(UBX_MON_COMMS, sizeof(UBX_MON_COMMS));
+    }
+    // Legacy messages (disabled by default)
     if (UBX_NAV_SVINFO_fl) {
         uart_write_blocking(uart0, UBX_NAV_SVINFO, sizeof(UBX_NAV_SVINFO));
         sec_sign_accumulate(UBX_NAV_SVINFO, sizeof(UBX_NAV_SVINFO));
@@ -306,14 +354,6 @@ void callback_1hz(TimerHandle_t xTimer) {
         uart_write_blocking(uart0, UBX_MON_HW, sizeof(UBX_MON_HW));
         sec_sign_accumulate(UBX_MON_HW, sizeof(UBX_MON_HW));
     }
-    if (UBX_NAV_POSLLH_fl) {
-        uart_write_blocking(uart0, UBX_NAV_POSLLH, sizeof(UBX_NAV_POSLLH));
-        sec_sign_accumulate(UBX_NAV_POSLLH, sizeof(UBX_NAV_POSLLH));
-    }
-    if (UBX_NAV_POSECEF_fl) {
-        uart_write_blocking(uart0, UBX_NAV_POSECEF, sizeof(UBX_NAV_POSECEF));
-        sec_sign_accumulate(UBX_NAV_POSECEF, sizeof(UBX_NAV_POSECEF));
-    }
 
     flag = !flag;
 }
@@ -322,9 +362,50 @@ void callback_10hz(TimerHandle_t xTimer) {
     flag = !flag;
     secunda();
 
+    // All NAV-* and RXM-* messages at 5Hz
     if (UBX_NAV_PVT_fl) {
         uart_write_blocking(uart0, UBX_NAV_PVT, sizeof(UBX_NAV_PVT));
         sec_sign_accumulate(UBX_NAV_PVT, sizeof(UBX_NAV_PVT));
+    }
+    if (UBX_NAV_POSECEF_fl) {
+        uart_write_blocking(uart0, UBX_NAV_POSECEF, sizeof(UBX_NAV_POSECEF));
+        sec_sign_accumulate(UBX_NAV_POSECEF, sizeof(UBX_NAV_POSECEF));
+    }
+    if (UBX_NAV_POSLLH_fl) {
+        uart_write_blocking(uart0, UBX_NAV_POSLLH, sizeof(UBX_NAV_POSLLH));
+        sec_sign_accumulate(UBX_NAV_POSLLH, sizeof(UBX_NAV_POSLLH));
+    }
+    if (UBX_NAV_STATUS_fl) {
+        uart_write_blocking(uart0, UBX_NAV_STATUS, sizeof(UBX_NAV_STATUS));
+        sec_sign_accumulate(UBX_NAV_STATUS, sizeof(UBX_NAV_STATUS));
+    }
+    if (UBX_NAV_DOP_fl) {
+        uart_write_blocking(uart0, UBX_NAV_DOP, sizeof(UBX_NAV_DOP));
+        sec_sign_accumulate(UBX_NAV_DOP, sizeof(UBX_NAV_DOP));
+    }
+    if (UBX_NAV_VELNED_fl) {
+        uart_write_blocking(uart0, UBX_NAV_VELNED, sizeof(UBX_NAV_VELNED));
+        sec_sign_accumulate(UBX_NAV_VELNED, sizeof(UBX_NAV_VELNED));
+    }
+    if (UBX_NAV_TIMEUTC_fl) {
+        uart_write_blocking(uart0, UBX_NAV_TIMEUTC, sizeof(UBX_NAV_TIMEUTC));
+        sec_sign_accumulate(UBX_NAV_TIMEUTC, sizeof(UBX_NAV_TIMEUTC));
+    }
+    if (UBX_NAV_CLOCK_fl) {
+        uart_write_blocking(uart0, UBX_NAV_CLOCK, sizeof(UBX_NAV_CLOCK));
+        sec_sign_accumulate(UBX_NAV_CLOCK, sizeof(UBX_NAV_CLOCK));
+    }
+    if (UBX_NAV_SAT_fl) {
+        uart_write_blocking(uart0, UBX_NAV_SAT, sizeof(UBX_NAV_SAT));
+        sec_sign_accumulate(UBX_NAV_SAT, sizeof(UBX_NAV_SAT));
+    }
+    if (UBX_NAV_AOPSTATUS_fl) {
+        uart_write_blocking(uart0, UBX_NAV_AOPSTATUS, sizeof(UBX_NAV_AOPSTATUS));
+        sec_sign_accumulate(UBX_NAV_AOPSTATUS, sizeof(UBX_NAV_AOPSTATUS));
+    }
+    if (UBX_RXM_RAWX_fl) {
+        uart_write_blocking(uart0, UBX_RXM_RAWX, sizeof(UBX_RXM_RAWX));
+        sec_sign_accumulate(UBX_RXM_RAWX, sizeof(UBX_RXM_RAWX));
     }
 
     flag = !flag;
