@@ -35,6 +35,9 @@
 #include "ws2812.pio.h"
 #include "uart_rx.pio.h"
 #include "massivs.h"
+#include "sha256.h"
+#include "uECC.h"
+#include <string.h>
 
 // ============================================================================
 // Configuration
@@ -50,6 +53,16 @@
 
 #define Timer_10hz      pdMS_TO_TICKS(100)
 #define Timer_1hz       pdMS_TO_TICKS(1000)
+#define Timer_4sec      pdMS_TO_TICKS(4000)
+
+// ============================================================================
+// SEC-SIGN ECDSA private key (SECP192R1)
+// ============================================================================
+static const uint8_t sec_sign_private_key[24] = {
+    0xea, 0xa5, 0xc0, 0x11, 0x1e, 0x18, 0xdb, 0xd1,
+    0x7a, 0xdb, 0x3d, 0xc9, 0x39, 0x4b, 0xfb, 0x45,
+    0x1f, 0x9d, 0x5e, 0x83, 0xf9, 0x38, 0x22, 0xc7
+};
 
 // ============================================================================
 // Global variables
@@ -70,8 +83,12 @@ volatile bool UBX_NAV_POSLLH_fl = false;
 volatile bool UBX_NAV_POSECEF_fl = false;
 volatile bool UBX_MON_HW_fl = false;
 
+// SEC-SIGN variables (always enabled, starts 4 sec after boot)
+SHA256_CTX sec_sign_sha256_ctx;
+volatile uint16_t sec_sign_packet_count = 0;
+
 // FreeRTOS handles
-TimerHandle_t TTimer_10hz, TTimer_1hz;
+TimerHandle_t TTimer_10hz, TTimer_1hz, TTimer_4sec;
 
 // PIO handles (shared between cores)
 PIO pio_led, pio_passthrough;
@@ -91,7 +108,10 @@ void secunda(void);
 void secunda2(void);
 void callback_1hz(TimerHandle_t xTimer);
 void callback_10hz(TimerHandle_t xTimer);
+void callback_4sec(TimerHandle_t xTimer);
 void vOneTimeTask(void *pvParameters);
+void sec_sign_accumulate(const uint8_t *msg, size_t len);
+void sec_sign_send(void);
 
 // ============================================================================
 // WS2812 LED functions
@@ -172,6 +192,80 @@ void secunda2(void) {
 }
 
 // ============================================================================
+// SEC-SIGN functions
+// ============================================================================
+
+void sec_sign_accumulate(const uint8_t *msg, size_t len) {
+    sha256_update(&sec_sign_sha256_ctx, msg, len);
+    sec_sign_packet_count++;
+}
+
+void sec_sign_send(void) {
+    // Get accumulated SHA256 hash
+    uint8_t sha256_field[32];
+    SHA256_CTX ctx_copy = sec_sign_sha256_ctx;
+    sha256_final(&ctx_copy, sha256_field);
+
+    // SessionID is zeros for M10
+    uint8_t sessionId[24] = {0};
+
+    // Compute z = SHA256(sha256_field || sessionId), then fold to 192 bits
+    uint8_t to_sign[56];
+    memcpy(to_sign, sha256_field, 32);
+    memcpy(to_sign + 32, sessionId, 24);
+
+    uint8_t final_hash[32];
+    sha256(to_sign, 56, final_hash);
+
+    // Fold: XOR bytes 0-7 with bytes 24-31
+    uint8_t z_bytes[24];
+    memcpy(z_bytes, final_hash, 24);
+    for (int i = 0; i < 8; i++) {
+        z_bytes[i] ^= final_hash[24 + i];
+    }
+
+    // Sign using ECDSA SECP192R1
+    uint8_t signature[48];  // R (24 bytes) + S (24 bytes)
+    uECC_Curve curve = uECC_secp192r1();
+
+    // uECC_sign expects hash to be truncated to curve size (192 bits = 24 bytes)
+    if (!uECC_sign(sec_sign_private_key, z_bytes, 24, signature, curve)) {
+        return;  // Signing failed
+    }
+
+    // Build SEC-SIGN message
+    // Version (bytes 6-7)
+    UBX_SEC_SIGN[6] = 0x01;
+    UBX_SEC_SIGN[7] = 0x00;
+
+    // Packet count (bytes 8-9, little-endian)
+    UBX_SEC_SIGN[8] = sec_sign_packet_count & 0xFF;
+    UBX_SEC_SIGN[9] = (sec_sign_packet_count >> 8) & 0xFF;
+
+    // SHA256 field (bytes 10-41)
+    memcpy(&UBX_SEC_SIGN[10], sha256_field, 32);
+
+    // SessionID (bytes 42-65)
+    memcpy(&UBX_SEC_SIGN[42], sessionId, 24);
+
+    // R signature (bytes 66-89)
+    memcpy(&UBX_SEC_SIGN[66], signature, 24);
+
+    // S signature (bytes 90-113)
+    memcpy(&UBX_SEC_SIGN[90], signature + 24, 24);
+
+    // Calculate checksum
+    CRC_gen(UBX_SEC_SIGN, sizeof(UBX_SEC_SIGN));
+
+    // Send message
+    uart_write_blocking(uart0, UBX_SEC_SIGN, sizeof(UBX_SEC_SIGN));
+
+    // Reset for next interval
+    sha256_init(&sec_sign_sha256_ctx);
+    sec_sign_packet_count = 0;
+}
+
+// ============================================================================
 // UART setup
 // ============================================================================
 
@@ -212,18 +306,23 @@ void callback_1hz(TimerHandle_t xTimer) {
 
     if (UBX_NAV_SVINFO_fl) {
         uart_write_blocking(uart0, UBX_NAV_SVINFO, sizeof(UBX_NAV_SVINFO));
+        sec_sign_accumulate(UBX_NAV_SVINFO, sizeof(UBX_NAV_SVINFO));
     }
     if (timepulse_fl) {
         uart_write_blocking(uart0, Timepulse, sizeof(Timepulse));
+        sec_sign_accumulate(Timepulse, sizeof(Timepulse));
     }
     if (UBX_MON_HW_fl) {
         uart_write_blocking(uart0, UBX_MON_HW, sizeof(UBX_MON_HW));
+        sec_sign_accumulate(UBX_MON_HW, sizeof(UBX_MON_HW));
     }
     if (UBX_NAV_POSLLH_fl) {
         uart_write_blocking(uart0, UBX_NAV_POSLLH, sizeof(UBX_NAV_POSLLH));
+        sec_sign_accumulate(UBX_NAV_POSLLH, sizeof(UBX_NAV_POSLLH));
     }
     if (UBX_NAV_POSECEF_fl) {
         uart_write_blocking(uart0, UBX_NAV_POSECEF, sizeof(UBX_NAV_POSECEF));
+        sec_sign_accumulate(UBX_NAV_POSECEF, sizeof(UBX_NAV_POSECEF));
     }
 
     flag = !flag;
@@ -235,9 +334,14 @@ void callback_10hz(TimerHandle_t xTimer) {
 
     if (UBX_NAV_PVT_fl) {
         uart_write_blocking(uart0, UBX_NAV_PVT, sizeof(UBX_NAV_PVT));
+        sec_sign_accumulate(UBX_NAV_PVT, sizeof(UBX_NAV_PVT));
     }
 
     flag = !flag;
+}
+
+void callback_4sec(TimerHandle_t xTimer) {
+    sec_sign_send();
 }
 
 // ============================================================================
@@ -472,13 +576,18 @@ int main(void) {
     // Launch Core1 for LED and GPIO handling
     multicore_launch_core1(core1_entry);
 
+    // Initialize SEC-SIGN (always enabled, starts 4 sec after boot)
+    sha256_init(&sec_sign_sha256_ctx);
+
     // Create FreeRTOS timers
     TTimer_1hz = xTimerCreate("1Hz", Timer_1hz, pdTRUE, 0, callback_1hz);
     TTimer_10hz = xTimerCreate("10Hz", Timer_10hz, pdTRUE, 0, callback_10hz);
+    TTimer_4sec = xTimerCreate("4sec", Timer_4sec, pdTRUE, 0, callback_4sec);
 
     // Start timers
     xTimerStart(TTimer_1hz, 0);
     xTimerStart(TTimer_10hz, 10);
+    xTimerStart(TTimer_4sec, 0);  // SEC-SIGN starts 4 sec after boot
 
     // Create one-time UART init task
     xTaskCreate(vOneTimeTask, "OneTimeTask", configMINIMAL_STACK_SIZE, NULL, 1, NULL);

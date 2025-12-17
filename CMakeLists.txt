@@ -111,6 +111,17 @@ endif()
 
 add_executable(ublox_fake_${PROJECT_SUFFIX}
     ${MAIN_SOURCE}
+    src/sha256.c
+    lib/micro-ecc/uECC.c
+)
+
+# micro-ecc configuration - use secp192r1
+target_compile_definitions(ublox_fake_${PROJECT_SUFFIX} PRIVATE
+    uECC_SUPPORTS_secp160r1=0
+    uECC_SUPPORTS_secp192r1=1
+    uECC_SUPPORTS_secp224r1=0
+    uECC_SUPPORTS_secp256r1=0
+    uECC_SUPPORTS_secp256k1=0
 )
 
 # Generate PIO headers
@@ -127,6 +138,7 @@ pico_generate_pio_header(ublox_fake_${PROJECT_SUFFIX}
 # Include directories
 target_include_directories(ublox_fake_${PROJECT_SUFFIX} PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/src
+    ${CMAKE_CURRENT_LIST_DIR}/lib/micro-ecc
 )
 
 # Link libraries
