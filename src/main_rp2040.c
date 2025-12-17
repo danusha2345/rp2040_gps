@@ -72,32 +72,35 @@ volatile int otvet = 0;
 volatile bool flag = 0;
 volatile bool flag_gpio6 = 1;
 
-// Message enable flags (matching real M10 device behavior)
+// Message enable flags (all disabled by default, enabled via CFG-MSG)
 // 5Hz messages (NAV-*)
-volatile bool UBX_NAV_PVT_fl = true;       // NAV-PVT always on
-volatile bool UBX_NAV_POSECEF_fl = true;   // NAV-POSECEF
-volatile bool UBX_NAV_POSLLH_fl = true;    // NAV-POSLLH
-volatile bool UBX_NAV_STATUS_fl = true;    // NAV-STATUS
-volatile bool UBX_NAV_DOP_fl = true;       // NAV-DOP
-volatile bool UBX_NAV_VELNED_fl = true;    // NAV-VELNED
-volatile bool UBX_NAV_TIMEUTC_fl = true;   // NAV-TIMEUTC
-volatile bool UBX_NAV_CLOCK_fl = true;     // NAV-CLOCK
-volatile bool UBX_NAV_SAT_fl = true;       // NAV-SAT
-volatile bool UBX_NAV_AOPSTATUS_fl = true; // NAV-AOPSTATUS
-volatile bool UBX_RXM_RAWX_fl = true;      // RXM-RAWX
+volatile bool UBX_NAV_PVT_fl = false;
+volatile bool UBX_NAV_POSECEF_fl = false;
+volatile bool UBX_NAV_POSLLH_fl = false;
+volatile bool UBX_NAV_STATUS_fl = false;
+volatile bool UBX_NAV_DOP_fl = false;
+volatile bool UBX_NAV_VELNED_fl = false;
+volatile bool UBX_NAV_TIMEUTC_fl = false;
+volatile bool UBX_NAV_CLOCK_fl = false;
+volatile bool UBX_NAV_SAT_fl = false;
+volatile bool UBX_NAV_AOPSTATUS_fl = false;
+volatile bool UBX_RXM_RAWX_fl = false;
 // 1Hz messages (MON-*)
-volatile bool UBX_MON_COMMS_fl = true;     // MON-COMMS
-// Legacy (disabled by default)
-volatile bool UBX_NAV_SVINFO_fl = false;   // NAV-SVINFO (old, use NAV-SAT)
-volatile bool UBX_MON_HW_fl = false;       // MON-HW (old)
-volatile bool timepulse_fl = false;        // TIM-TP (not in M10 log)
+volatile bool UBX_MON_COMMS_fl = false;
+// Legacy
+volatile bool UBX_NAV_SVINFO_fl = false;
+volatile bool UBX_MON_HW_fl = false;
+volatile bool timepulse_fl = false;
+
+// Flag to start message transmission after 1 second delay
+volatile bool msg_output_started = false;
 
 // SEC-SIGN variables (always enabled, first at 3s, then every 4s)
 SHA256_CTX sec_sign_sha256_ctx;
 volatile uint16_t sec_sign_packet_count = 0;
 
 // FreeRTOS handles
-TimerHandle_t TTimer_10hz, TTimer_1hz, TTimer_first_sec_sign, TTimer_4sec;
+TimerHandle_t TTimer_10hz, TTimer_1hz, TTimer_first_sec_sign, TTimer_4sec, TTimer_msg_start;
 TaskHandle_t Led_handle;
 
 // PIO handles
@@ -119,6 +122,7 @@ void callback_1hz(TimerHandle_t xTimer);
 void callback_10hz(TimerHandle_t xTimer);
 void callback_first_sec_sign(TimerHandle_t xTimer);
 void callback_4sec(TimerHandle_t xTimer);
+void callback_msg_start(TimerHandle_t xTimer);
 void Led_blink_task(void *pvParameters);
 void sec_sign_accumulate(const uint8_t *msg, size_t len);
 void sec_sign_send(void);
@@ -336,6 +340,12 @@ void callback_1hz(TimerHandle_t xTimer) {
     flag = !flag;
     secunda2();
 
+    // Wait for msg_output_started before sending
+    if (!msg_output_started) {
+        flag = !flag;
+        return;
+    }
+
     // MON-* messages at 1Hz
     if (UBX_MON_COMMS_fl) {
         uart_write_blocking(uart0, UBX_MON_COMMS, sizeof(UBX_MON_COMMS));
@@ -361,6 +371,12 @@ void callback_1hz(TimerHandle_t xTimer) {
 void callback_10hz(TimerHandle_t xTimer) {
     flag = !flag;
     secunda();
+
+    // Wait for msg_output_started before sending
+    if (!msg_output_started) {
+        flag = !flag;
+        return;
+    }
 
     // All NAV-* and RXM-* messages at 5Hz
     if (UBX_NAV_PVT_fl) {
@@ -420,6 +436,11 @@ void callback_first_sec_sign(TimerHandle_t xTimer) {
 
 void callback_4sec(TimerHandle_t xTimer) {
     sec_sign_send();
+}
+
+void callback_msg_start(TimerHandle_t xTimer) {
+    // Called 1 second after first CFG-MSG, enables message output
+    msg_output_started = true;
 }
 
 // ============================================================================
@@ -597,6 +618,11 @@ void on_uart_rx0(void) {
         if (RxData[6] == 0x0D && RxData[7] == 0x01 && RxData[8] > 0) {
             timepulse_fl = true;
         }
+
+        // Start message output after 1 second delay (if not already started)
+        if (!msg_output_started) {
+            xTimerStart(TTimer_msg_start, 0);
+        }
     }
 
     // UBX-CFG-VALSET (0x06 0x8A) - M10 configuration (needs 12+ bytes minimum)
@@ -631,6 +657,11 @@ void on_uart_rx0(void) {
         busy_wait_us(350);
         uart_write_blocking(uart0, mes_7, sizeof(mes_7));  // ACK-ACK
         otvet++;
+
+        // Start message output after 1 second delay (if not already started)
+        if (!msg_output_started) {
+            xTimerStart(TTimer_msg_start, 0);
+        }
     }
 
     count = 0;
@@ -695,6 +726,8 @@ int main(void) {
     TTimer_first_sec_sign = xTimerCreate("FirstSecSign", Timer_3sec, pdFALSE, 0, callback_first_sec_sign);
     // Periodic timer for subsequent SEC-SIGN every 4 seconds
     TTimer_4sec = xTimerCreate("4sec", Timer_4sec, pdTRUE, 0, callback_4sec);
+    // One-shot timer for message output start (1 second after first CFG-MSG)
+    TTimer_msg_start = xTimerCreate("MsgStart", pdMS_TO_TICKS(1000), pdFALSE, 0, callback_msg_start);
 
     // Create LED blink task
     xTaskCreate(Led_blink_task, "LED", configMINIMAL_STACK_SIZE, NULL, 1, &Led_handle);
