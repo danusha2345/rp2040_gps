@@ -1,0 +1,40 @@
+
+.pio_version 0 // only requires PIO version 0
+
+.program uart_rx_mini
+
+.wrap_target
+    wait 1 pin 0
+    set pins, 1
+    wait 0 pin 0
+    set pins, 0
+.wrap
+
+
+% c-sdk {
+#include "hardware/clocks.h"
+#include "hardware/gpio.h"
+
+static inline void uart_rx_mini_program_init(PIO pio, uint sm, uint offset, uint pinin, uint pinout , uint baud) {
+    
+    pio_sm_set_consecutive_pindirs(pio, sm, pinin, 1, false);
+    pio_gpio_init(pio, pinin);
+    gpio_pull_up(pinin);
+    pio_sm_set_consecutive_pindirs(pio, sm, pinout, 1, true);
+    pio_gpio_init(pio, pinout);
+    pio_sm_config c = uart_rx_mini_program_get_default_config(offset);
+    sm_config_set_in_pins(&c, pinin); // for WAIT, IN
+    sm_config_set_sideset_pins(&c, pinout);
+    sm_config_set_set_pins(&c, pinout, 1);
+    
+    // Shift to right, autopush enabled
+    //sm_config_set_in_shift(&c, true, false, 1);
+    //sm_config_set_out_shift(&c, true, false, 1);
+    //sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_NONE);
+    
+    float div = (float)clock_get_hz(clk_sys) / (baud);
+    sm_config_set_clkdiv(&c, div);
+    
+    pio_sm_init(pio, sm, offset, &c);
+}
+%}
