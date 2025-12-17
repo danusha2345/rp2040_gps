@@ -59,8 +59,8 @@ volatile bool flag = 0;
 volatile bool flag_gpio6 = 1;
 
 // Message enable flags
-volatile bool UBX_NAV_PVT_fl = true;
-volatile bool UBX_NAV_SVINFO_fl = true;
+volatile bool UBX_NAV_PVT_fl = false;
+volatile bool UBX_NAV_SVINFO_fl = false;
 volatile bool timepulse_fl = false;
 volatile bool UBX_NAV_POSLLH_fl = false;
 volatile bool UBX_NAV_POSECEF_fl = false;
