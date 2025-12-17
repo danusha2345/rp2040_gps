@@ -5,3 +5,4 @@ build/
 *.hex
 *.map
 *.dis
+*.pio.h

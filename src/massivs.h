@@ -277,12 +277,12 @@ uint8_t UBX_NAV_SAT[20] = {
 uint8_t UBX_NAV_AOPSTATUS[24] = {
     0xB5, 0x62, 0x01, 0x60, 0x10, 0x00,
     0xF0, 0x23, 0x00, 0x00,  // iTOW [6-9]
-    0x00,                    // config
-    0x01,                    // status (idle)
+    0x01,                    // config (AOP enabled)
+    0x00,                    // status (idle)
     0x00, 0x00,              // reserved
     0x00, 0x00, 0x00, 0x00,  // reserved
     0x00, 0x00, 0x00, 0x00,  // reserved
-    0x75, 0x89               // CRC
+    0x76, 0x89               // CRC
 };
 
 // UBX-RXM-RAWX (0x02 0x15) - Raw measurement data
