@@ -51,9 +51,10 @@
 #define MODE_BTN_PIN    6
 #define MODE_BTN_PWR    5
 
-#define Timer_10hz      pdMS_TO_TICKS(100)
+#define Timer_10hz      pdMS_TO_TICKS(200)   // 5Hz (как в реальном устройстве)
 #define Timer_1hz       pdMS_TO_TICKS(1000)
-#define Timer_4sec      pdMS_TO_TICKS(4000)
+#define Timer_3sec      pdMS_TO_TICKS(3000)   // First SEC-SIGN delay
+#define Timer_4sec      pdMS_TO_TICKS(4000)   // Subsequent SEC-SIGN period
 
 // ============================================================================
 // SEC-SIGN ECDSA private key (SECP192R1)
@@ -83,12 +84,12 @@ volatile bool UBX_NAV_POSLLH_fl = false;
 volatile bool UBX_NAV_POSECEF_fl = false;
 volatile bool UBX_MON_HW_fl = false;
 
-// SEC-SIGN variables (always enabled, starts 4 sec after boot)
+// SEC-SIGN variables (always enabled, first at 3s, then every 4s)
 SHA256_CTX sec_sign_sha256_ctx;
 volatile uint16_t sec_sign_packet_count = 0;
 
 // FreeRTOS handles
-TimerHandle_t TTimer_10hz, TTimer_1hz, TTimer_4sec;
+TimerHandle_t TTimer_10hz, TTimer_1hz, TTimer_first_sec_sign, TTimer_4sec;
 
 // PIO handles (shared between cores)
 PIO pio_led, pio_passthrough;
@@ -102,12 +103,13 @@ void core1_entry(void);
 void setup_uart0(void);
 void off_uart0(void);
 void on_uart_rx0(void);
-void gpio_6_on(void);
+void gpio_6_on(uint gpio, uint32_t events);
 void CRC_gen(uint8_t *adr, int razmer);
 void secunda(void);
 void secunda2(void);
 void callback_1hz(TimerHandle_t xTimer);
 void callback_10hz(TimerHandle_t xTimer);
+void callback_first_sec_sign(TimerHandle_t xTimer);
 void callback_4sec(TimerHandle_t xTimer);
 void vOneTimeTask(void *pvParameters);
 void sec_sign_accumulate(const uint8_t *msg, size_t len);
@@ -340,6 +342,13 @@ void callback_10hz(TimerHandle_t xTimer) {
     flag = !flag;
 }
 
+void callback_first_sec_sign(TimerHandle_t xTimer) {
+    // First SEC-SIGN at 3 seconds after boot
+    sec_sign_send();
+    // Start periodic 4-second timer for subsequent SEC-SIGN messages
+    xTimerStart(TTimer_4sec, 0);
+}
+
 void callback_4sec(TimerHandle_t xTimer) {
     sec_sign_send();
 }
@@ -362,7 +371,9 @@ bool timer_callback(__unused struct repeating_timer *t) {
 // Mode button handler (GPIO6) - runs on Core1
 // ============================================================================
 
-void gpio_6_on(void) {
+void gpio_6_on(uint gpio, uint32_t events) {
+    (void)gpio;   // Unused parameter
+    (void)events; // Unused parameter
     gpio_put(MODE_BTN_PWR, 0);
     busy_wait_ms(100);
 
@@ -553,6 +564,40 @@ void on_uart_rx0(void) {
         }
     }
 
+    // UBX-CFG-VALSET (0x06 0x8A) - M10 configuration (needs 12+ bytes minimum)
+    if (count >= 12 && RxData[2] == 0x06 && RxData[3] == 0x8A) {
+        uint16_t payload_len = RxData[4] | (RxData[5] << 8);
+        // Parse key-value pairs starting at offset 10 (after header + version + layers + reserved)
+        int i = 10;
+        int end = 6 + payload_len;
+
+        while (i + 4 <= end && i + 4 < count) {
+            uint32_t key = RxData[i] | (RxData[i+1] << 8) | (RxData[i+2] << 16) | (RxData[i+3] << 24);
+            uint8_t key_size = (key >> 28) & 0x07;
+            // Size mapping: 1=1bit, 2=1byte, 3=2bytes, 4=4bytes, 5=8bytes
+            uint8_t val_size = (key_size == 3) ? 2 : (key_size == 4) ? 4 : (key_size == 5) ? 8 : 1;
+            i += 4;
+
+            if (i + val_size <= end && i + val_size <= count) {
+                // CFG-RATE-MEAS (0x30210001) - measurement period in ms
+                if (key == 0x30210001) {
+                    uint16_t period_ms = RxData[i] | (RxData[i+1] << 8);
+                    if (period_ms >= 50 && period_ms <= 10000) {
+                        xTimerChangePeriod(TTimer_10hz, pdMS_TO_TICKS(period_ms), 0);
+                    }
+                }
+                i += val_size;
+            } else {
+                break;
+            }
+        }
+
+        // Send ACK
+        busy_wait_us(350);
+        uart_write_blocking(uart0, mes_7, sizeof(mes_7));  // ACK-ACK
+        otvet++;
+    }
+
     count = 0;
 }
 
@@ -576,18 +621,21 @@ int main(void) {
     // Launch Core1 for LED and GPIO handling
     multicore_launch_core1(core1_entry);
 
-    // Initialize SEC-SIGN (always enabled, starts 4 sec after boot)
+    // Initialize SEC-SIGN (always enabled, first at 3s, then every 4s)
     sha256_init(&sec_sign_sha256_ctx);
 
     // Create FreeRTOS timers
     TTimer_1hz = xTimerCreate("1Hz", Timer_1hz, pdTRUE, 0, callback_1hz);
     TTimer_10hz = xTimerCreate("10Hz", Timer_10hz, pdTRUE, 0, callback_10hz);
+    // One-shot timer for first SEC-SIGN at 3 seconds
+    TTimer_first_sec_sign = xTimerCreate("FirstSecSign", Timer_3sec, pdFALSE, 0, callback_first_sec_sign);
+    // Periodic timer for subsequent SEC-SIGN every 4 seconds
     TTimer_4sec = xTimerCreate("4sec", Timer_4sec, pdTRUE, 0, callback_4sec);
 
     // Start timers
     xTimerStart(TTimer_1hz, 0);
     xTimerStart(TTimer_10hz, 10);
-    xTimerStart(TTimer_4sec, 0);  // SEC-SIGN starts 4 sec after boot
+    xTimerStart(TTimer_first_sec_sign, 0);  // First SEC-SIGN at 3s, then periodic 4s
 
     // Create one-time UART init task
     xTaskCreate(vOneTimeTask, "OneTimeTask", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
