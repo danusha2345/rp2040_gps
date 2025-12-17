@@ -346,7 +346,7 @@ void on_uart_rx0(void) {
     // UBX-MON-VER (0x0A 0x04) - Version request
     if (flag == 0 && RxData[2] == 0x0A && RxData[3] == 0x04) {
         busy_wait_us(350);
-        uart_write_blocking(uart0, monitor_ver, sizeof(monitor_ver));
+        uart_write_blocking(uart0, monitor_ver_M10, sizeof(monitor_ver_M10));
         otvet++;
     }
 
