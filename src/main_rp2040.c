@@ -304,38 +304,22 @@ void on_uart_rx0(void) {
     }
 
     // UBX-CFG-PRT (0x06 0x00) - Port configuration
-    if (RxData[2] == 0x06 && RxData[3] == 0x00 && count >= 16) {
-        // Disable all messages
-        if (RxData[8] == 0x00) {
+    if (RxData[2] == 0x06 && RxData[3] == 0x00 && count >= 18) {
+        // Read 32-bit baudrate from bytes 14-17 (little-endian)
+        uint32_t baudrate = RxData[14] | (RxData[15] << 8) |
+                           (RxData[16] << 16) | (RxData[17] << 24);
+
+        if (baudrate > 0) {
+            skorost_uart_0 = baudrate;
+            uart_set_baudrate(uart0, skorost_uart_0);
+            busy_wait_ms(1);
+            uart_write_blocking(uart0, mes_1, sizeof(mes_1));
+            otvet++;
+        } else {
+            // Baudrate 0 = disable messages
             timepulse_fl = false;
             UBX_NAV_PVT_fl = false;
             UBX_NAV_SVINFO_fl = false;
-            otvet++;
-        }
-        // Baudrate 9600
-        if (RxData[15] == 0x25) {
-            skorost_uart_0 = 9600;
-            uart_set_baudrate(uart0, skorost_uart_0);
-            UBX_NAV_PVT_fl = false;
-            UBX_NAV_SVINFO_fl = false;
-            busy_wait_ms(1);
-            uart_write_blocking(uart0, mes_1, sizeof(mes_1));
-            otvet++;
-        }
-        // Baudrate 115200
-        if (RxData[15] == 0xC2) {
-            skorost_uart_0 = 115200;
-            uart_set_baudrate(uart0, skorost_uart_0);
-            busy_wait_ms(1);
-            uart_write_blocking(uart0, mes_1, sizeof(mes_1));
-            otvet++;
-        }
-        // Baudrate 460800
-        if (RxData[15] == 0x08) {
-            skorost_uart_0 = 460800;
-            uart_set_baudrate(uart0, skorost_uart_0);
-            busy_wait_ms(1);
-            uart_write_blocking(uart0, mes_1, sizeof(mes_1));
             otvet++;
         }
     }
