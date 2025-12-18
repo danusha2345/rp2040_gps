@@ -70,7 +70,7 @@ static const uint8_t sec_sign_private_key[24] = {
 // ============================================================================
 
 volatile int r = 0, g = 50, b = 0;
-volatile uint skorost_uart_0 = 115200;
+volatile uint skorost_uart_0 = 921600;
 volatile int count = 0;
 volatile int otvet = 0;
 volatile bool flag = 0;
