@@ -761,52 +761,53 @@ void on_uart_rx0(void) {
                         }
                         break;
 
-                    // CFG-MSGOUT-UBX_NAV_PVT_UART1 (0x20910007)
+                    // ============= CORRECTED KEYS FROM REFERENCE (air3s_2_reference.txt) =============
+                    // CFG-MSGOUT-UBX_NAV_PVT_UART1
                     case 0x20910007: UBX_NAV_PVT_fl = (val8 > 0); break;
-                    // CFG-MSGOUT-UBX_NAV_POSECEF_UART1 (0x2091000D)
-                    case 0x2091000D: UBX_NAV_POSECEF_fl = (val8 > 0); break;
-                    // CFG-MSGOUT-UBX_NAV_POSLLH_UART1 (0x2091000F)
-                    case 0x2091000F: UBX_NAV_POSLLH_fl = (val8 > 0); break;
-                    // CFG-MSGOUT-UBX_NAV_STATUS_UART1 (0x2091001F)
-                    case 0x2091001F: UBX_NAV_STATUS_fl = (val8 > 0); break;
-                    // CFG-MSGOUT-UBX_NAV_DOP_UART1 (0x2091001B)
-                    case 0x2091001B: UBX_NAV_DOP_fl = (val8 > 0); break;
-                    // CFG-MSGOUT-UBX_NAV_VELNED_UART1 (0x20910024)
-                    case 0x20910024: UBX_NAV_VELNED_fl = (val8 > 0); break;
-                    // CFG-MSGOUT-UBX_NAV_TIMEUTC_UART1 (0x20910021)
-                    case 0x20910021: UBX_NAV_TIMEUTC_fl = (val8 > 0); break;
-                    // CFG-MSGOUT-UBX_NAV_CLOCK_UART1 (0x20910016)
-                    case 0x20910016: UBX_NAV_CLOCK_fl = (val8 > 0); break;
-                    // CFG-MSGOUT-UBX_NAV_SAT_UART1 (0x20910022)
-                    case 0x20910022: UBX_NAV_SAT_fl = (val8 > 0); break;
-                    // CFG-MSGOUT-UBX_NAV_AOPSTATUS_UART1 (0x20910039)
-                    case 0x20910039: UBX_NAV_AOPSTATUS_fl = (val8 > 0); break;
-                    // CFG-MSGOUT-UBX_RXM_RAWX_UART1 (0x2091007A)
-                    case 0x2091007A: UBX_RXM_RAWX_fl = (val8 > 0); break;
-                    // CFG-MSGOUT-UBX_TIM_TP_UART1 (0x209102A5)
-                    case 0x209102A5: timepulse_fl = (val8 > 0); break;
-                    // CFG-MSGOUT-UBX_MON_COMMS_UART1 (0x20910232)
-                    case 0x20910232: UBX_MON_COMMS_fl = (val8 > 0); break;
-                    // CFG-MSGOUT-UBX_MON_HW_UART1 (0x2091035A)
-                    case 0x2091035A: UBX_MON_HW_fl = (val8 > 0); break;
-                    // CFG-MSGOUT-UBX_MON_RF_UART1 (0x2091034B)
-                    case 0x2091034B: UBX_MON_RF_fl = (val8 > 0); break;
-                    // CFG-MSGOUT-UBX_SEC_SIG_UART1 (0x2091017E) - SEC-SIGN is always on
-                    case 0x2091017E: /* SEC-SIGN always enabled */ break;
-
-                    // New M10 messages
-                    // CFG-MSGOUT-UBX_NAV_TIMEGPS_UART1 (0x20910025)
-                    case 0x20910025: UBX_NAV_TIMEGPS_fl = (val8 > 0); break;
-                    // CFG-MSGOUT-UBX_NAV_VELECEF_UART1 (0x2091002A)
-                    case 0x2091002A: UBX_NAV_VELECEF_fl = (val8 > 0); break;
-                    // CFG-MSGOUT-UBX_NAV_TIMELS_UART1 (0x2091005C)
-                    case 0x2091005C: UBX_NAV_TIMELS_fl = (val8 > 0); break;
-                    // CFG-MSGOUT-UBX_NAV_COV_UART1 (0x20910066)
-                    case 0x20910066: UBX_NAV_COV_fl = (val8 > 0); break;
-                    // CFG-MSGOUT-UBX_NAV_HPPOSECEF_UART1 (0x20910043)
-                    case 0x20910043: UBX_NAV_HPPOSECEF_fl = (val8 > 0); break;
-                    // CFG-MSGOUT-UBX_NAV_EOE_UART1 (0x2091003E)
-                    case 0x2091003E: UBX_NAV_EOE_fl = (val8 > 0); break;
+                    // CFG-MSGOUT-UBX_NAV_SAT_UART1
+                    case 0x20910016: UBX_NAV_SAT_fl = (val8 > 0); break;
+                    // CFG-MSGOUT-UBX_NAV_STATUS_UART1
+                    case 0x2091001B: UBX_NAV_STATUS_fl = (val8 > 0); break;
+                    // CFG-MSGOUT-UBX_NAV_POSECEF_UART1
+                    case 0x20910025: UBX_NAV_POSECEF_fl = (val8 > 0); break;
+                    // CFG-MSGOUT-UBX_NAV_POSLLH_UART1
+                    case 0x2091002A: UBX_NAV_POSLLH_fl = (val8 > 0); break;
+                    // CFG-MSGOUT-UBX_NAV_DOP_UART1
+                    case 0x20910039: UBX_NAV_DOP_fl = (val8 > 0); break;
+                    // CFG-MSGOUT-UBX_NAV_VELECEF_UART1
+                    case 0x2091003E: UBX_NAV_VELECEF_fl = (val8 > 0); break;
+                    // CFG-MSGOUT-UBX_NAV_VELNED_UART1
+                    case 0x20910043: UBX_NAV_VELNED_fl = (val8 > 0); break;
+                    // CFG-MSGOUT-UBX_NAV_TIMEGPS_UART1
+                    case 0x20910048: UBX_NAV_TIMEGPS_fl = (val8 > 0); break;
+                    // CFG-MSGOUT-UBX_NAV_TIMEUTC_UART1
+                    case 0x2091005C: UBX_NAV_TIMEUTC_fl = (val8 > 0); break;
+                    // CFG-MSGOUT-UBX_NAV_TIMELS_UART1
+                    case 0x20910061: UBX_NAV_TIMELS_fl = (val8 > 0); break;
+                    // CFG-MSGOUT-UBX_NAV_CLOCK_UART1
+                    case 0x20910066: UBX_NAV_CLOCK_fl = (val8 > 0); break;
+                    // CFG-MSGOUT-UBX_NAV_AOPSTATUS_UART1
+                    case 0x2091007A: UBX_NAV_AOPSTATUS_fl = (val8 > 0); break;
+                    // CFG-MSGOUT-UBX_NAV_COV_UART1
+                    case 0x20910084: UBX_NAV_COV_fl = (val8 > 0); break;
+                    // CFG-MSGOUT-UBX_NAV_EOE_UART1
+                    case 0x20910160: UBX_NAV_EOE_fl = (val8 > 0); break;
+                    // CFG-MSGOUT-UBX_TIM_TP_UART1
+                    case 0x2091017E: timepulse_fl = (val8 > 0); break;
+                    // CFG-MSGOUT-UBX_MON_HW_UART1
+                    case 0x209101B5: UBX_MON_HW_fl = (val8 > 0); break;
+                    // CFG-MSGOUT-UBX_RXM_SFRBX_UART1
+                    case 0x20910232: /* RXM_SFRBX not implemented */ break;
+                    // CFG-MSGOUT-UBX_RXM_RAWX_UART1
+                    case 0x209102A5: UBX_RXM_RAWX_fl = (val8 > 0); break;
+                    // CFG-MSGOUT-UBX_SEC_ECSIGN_UART1 (SEC-SIGN period, value=4 means every 4 epochs)
+                    case 0x2091034B: /* SEC-SIGN always enabled */ break;
+                    // CFG-MSGOUT-UBX_MON_COMMS_UART1
+                    case 0x20910350: UBX_MON_COMMS_fl = (val8 > 0); break;
+                    // CFG-MSGOUT-UBX_MON_RF_UART1
+                    case 0x2091035A: UBX_MON_RF_fl = (val8 > 0); break;
+                    // CFG-MSGOUT-UBX_NAV_HPPOSECEF_UART1
+                    case 0x20910036: UBX_NAV_HPPOSECEF_fl = (val8 > 0); break;
 
                     default:
                         break;

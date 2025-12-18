@@ -1,0 +1,549 @@
+==========================================================================================
+u-blox M10 Configuration Messages - Reference Log
+Extracted from: air3s_2.csv
+==========================================================================================
+
+[01] ===== MON-VER =====
+
+REQUEST (Host → GNSS):
+  Class: 0x0A  ID: 0x04  Payload Length: 0
+  Raw: B5 62 0A 04 00 00 0E 34
+
+RESPONSE (GNSS → Host):
+  MON-VER Response (len=160):
+  SW Version: ROM SPG 5.10 (7b202e)
+  Raw: B5 62 0A 04 A0 00 52 4F 4D 20 53 50 47 20 35 2E 31 30 20 28 37 62 32 30 32 65 29 00 00 00 00 00 00 00 00 00 30 30 30 41 30 30 30 30 00 00 46 57 56 45 52 3D 53 50 47 20 35 2E 31 30 ...
+
+------------------------------------------------------------------------------------------
+
+[02] ===== CFG-VALSET =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x8A  Payload Length: 14
+  Raw: B5 62 06 8A 0E 00 00 01 00 00 01 00 74 10 01 02 00 74 10 00 AB 29
+  Key-Value pairs:
+    CFG-UART1INPROT-UBX: 1
+    CFG-UART1INPROT-NMEA: 0
+
+RESPONSE (GNSS → Host):
+  ACK-ACK: Acknowledged CFG-VALSET
+  Raw: B5 62 05 01 02 00 06 8A 98 C1
+
+------------------------------------------------------------------------------------------
+
+[03] ===== CFG-VALSET =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x8A  Payload Length: 14
+  Raw: B5 62 06 8A 0E 00 00 01 00 00 01 00 74 10 01 02 00 74 10 00 AB 29
+  Key-Value pairs:
+    CFG-UART1INPROT-UBX: 1
+    CFG-UART1INPROT-NMEA: 0
+
+RESPONSE (GNSS → Host):
+  ACK-ACK: Acknowledged CFG-VALSET
+  Raw: B5 62 05 01 02 00 06 8A 98 C1
+
+------------------------------------------------------------------------------------------
+
+[04] ===== CFG-VALSET =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x8A  Payload Length: 14
+  Raw: B5 62 06 8A 0E 00 00 01 00 00 01 00 74 10 01 02 00 74 10 00 AB 29
+  Key-Value pairs:
+    CFG-UART1INPROT-UBX: 1
+    CFG-UART1INPROT-NMEA: 0
+
+RESPONSE (GNSS → Host):
+  ACK-ACK: Acknowledged CFG-VALSET
+  Raw: B5 62 05 01 02 00 06 8A 98 C1
+
+------------------------------------------------------------------------------------------
+
+[05] ===== CFG-VALSET =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x8A  Payload Length: 39
+  Raw: B5 62 06 8A 27 00 00 01 00 00 1F 00 31 10 01 21 00 31 10 01 22 00 31 10 01 0D 00 31 10 01 0F 00 31 10 00 24 00 31 10 01 25 00 31 10 00 4B 70
+  Key-Value pairs:
+    CFG-SIGNAL-GPS_L1CA_ENA: 1
+    CFG-SIGNAL-SBAS_ENA: 1
+    CFG-SIGNAL-SBAS_L1CA_ENA: 1
+    CFG-SIGNAL-GAL_ENA: 1
+    CFG-SIGNAL-GAL_E1_ENA: 0
+    CFG-SIGNAL-BDS_ENA: 1
+    CFG-SIGNAL-BDS_B1_ENA: 0
+
+RESPONSE (GNSS → Host):
+  ACK-ACK: Acknowledged CFG-VALSET
+  Raw: B5 62 05 01 02 00 06 8A 98 C1
+
+------------------------------------------------------------------------------------------
+
+[06] ===== CFG-VALSET =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x8A  Payload Length: 39
+  Raw: B5 62 06 8A 27 00 00 01 00 00 1F 00 31 10 01 21 00 31 10 01 22 00 31 10 01 0D 00 31 10 01 0F 00 31 10 00 24 00 31 10 01 25 00 31 10 00 4B 70
+  Key-Value pairs:
+    CFG-SIGNAL-GPS_L1CA_ENA: 1
+    CFG-SIGNAL-SBAS_ENA: 1
+    CFG-SIGNAL-SBAS_L1CA_ENA: 1
+    CFG-SIGNAL-GAL_ENA: 1
+    CFG-SIGNAL-GAL_E1_ENA: 0
+    CFG-SIGNAL-BDS_ENA: 1
+    CFG-SIGNAL-BDS_B1_ENA: 0
+
+RESPONSE (GNSS → Host):
+  ACK-ACK: Acknowledged CFG-VALSET
+  Raw: B5 62 05 01 02 00 06 8A 98 C1
+
+------------------------------------------------------------------------------------------
+
+[07] ===== CFG-VALSET =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x8A  Payload Length: 9
+  Raw: B5 62 06 8A 09 00 00 01 00 00 7E 01 91 20 01 CB 9F
+  Key-Value pairs:
+    CFG-MSGOUT-UBX_TIM_TP_UART1: 1
+
+RESPONSE (GNSS → Host):
+  ACK-ACK: Acknowledged CFG-VALSET
+  Raw: B5 62 05 01 02 00 06 8A 98 C1
+
+------------------------------------------------------------------------------------------
+
+[08] ===== CFG-VALSET =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x8A  Payload Length: 9
+  Raw: B5 62 06 8A 09 00 00 01 00 00 25 00 91 20 01 71 DE
+  Key-Value pairs:
+    CFG-MSGOUT-UBX_NAV_POSECEF_UART1: 1
+
+RESPONSE (GNSS → Host):
+  ACK-ACK: Acknowledged CFG-VALSET
+  Raw: B5 62 05 01 02 00 06 8A 98 C1
+
+------------------------------------------------------------------------------------------
+
+[09] ===== CFG-VALSET =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x8A  Payload Length: 9
+  Raw: B5 62 06 8A 09 00 00 01 00 00 2A 00 91 20 01 76 F7
+  Key-Value pairs:
+    CFG-MSGOUT-UBX_NAV_POSLLH_UART1: 1
+
+RESPONSE (GNSS → Host):
+  ACK-ACK: Acknowledged CFG-VALSET
+  Raw: B5 62 05 01 02 00 06 8A 98 C1
+
+------------------------------------------------------------------------------------------
+
+[10] ===== CFG-VALSET =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x8A  Payload Length: 9
+  Raw: B5 62 06 8A 09 00 00 01 00 00 1B 00 91 20 01 67 AC
+  Key-Value pairs:
+    CFG-MSGOUT-UBX_NAV_STATUS_UART1: 1
+
+RESPONSE (GNSS → Host):
+  ACK-ACK: Acknowledged CFG-VALSET
+  Raw: B5 62 05 01 02 00 06 8A 98 C1
+
+------------------------------------------------------------------------------------------
+
+[11] ===== CFG-VALSET =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x8A  Payload Length: 9
+  Raw: B5 62 06 8A 09 00 00 01 00 00 39 00 91 20 01 85 42
+  Key-Value pairs:
+    CFG-MSGOUT-UBX_NAV_DOP_UART1: 1
+
+RESPONSE (GNSS → Host):
+  ACK-ACK: Acknowledged CFG-VALSET
+  Raw: B5 62 05 01 02 00 06 8A 98 C1
+
+------------------------------------------------------------------------------------------
+
+[12] ===== CFG-VALSET =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x8A  Payload Length: 9
+  Raw: B5 62 06 8A 09 00 00 01 00 00 07 00 91 20 01 53 48
+  Key-Value pairs:
+    CFG-MSGOUT-UBX_NAV_PVT_UART1: 1
+
+RESPONSE (GNSS → Host):
+  ACK-ACK: Acknowledged CFG-VALSET
+  Raw: B5 62 05 01 02 00 06 8A 98 C1
+
+------------------------------------------------------------------------------------------
+
+[13] ===== CFG-VALSET =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x8A  Payload Length: 9
+  Raw: B5 62 06 8A 09 00 00 01 00 00 3E 00 91 20 00 89 5A
+  Key-Value pairs:
+    CFG-MSGOUT-UBX_NAV_VELECEF_UART1: 0
+
+RESPONSE (GNSS → Host):
+  ACK-ACK: Acknowledged CFG-VALSET
+  Raw: B5 62 05 01 02 00 06 8A 98 C1
+
+------------------------------------------------------------------------------------------
+
+[14] ===== CFG-VALSET =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x8A  Payload Length: 9
+  Raw: B5 62 06 8A 09 00 00 01 00 00 43 00 91 20 01 8F 74
+  Key-Value pairs:
+    CFG-MSGOUT-UBX_NAV_VELNED_UART1: 1
+
+RESPONSE (GNSS → Host):
+  ACK-ACK: Acknowledged CFG-VALSET
+  Raw: B5 62 05 01 02 00 06 8A 98 C1
+
+------------------------------------------------------------------------------------------
+
+[15] ===== CFG-VALSET =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x8A  Payload Length: 9
+  Raw: B5 62 06 8A 09 00 00 01 00 00 48 00 91 20 00 93 8C
+  Key-Value pairs:
+    CFG-MSGOUT-UBX_NAV_TIMEGPS_UART1: 0
+
+RESPONSE (GNSS → Host):
+  ACK-ACK: Acknowledged CFG-VALSET
+  Raw: B5 62 05 01 02 00 06 8A 98 C1
+
+------------------------------------------------------------------------------------------
+
+[16] ===== CFG-VALSET =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x8A  Payload Length: 9
+  Raw: B5 62 06 8A 09 00 00 01 00 00 5C 00 91 20 01 A8 F1
+  Key-Value pairs:
+    CFG-MSGOUT-UBX_NAV_TIMEUTC_UART1: 1
+
+RESPONSE (GNSS → Host):
+  ACK-ACK: Acknowledged CFG-VALSET
+  Raw: B5 62 05 01 02 00 06 8A 98 C1
+
+------------------------------------------------------------------------------------------
+
+[17] ===== CFG-VALSET =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x8A  Payload Length: 9
+  Raw: B5 62 06 8A 09 00 00 01 00 00 66 00 91 20 01 B2 23
+  Key-Value pairs:
+    CFG-MSGOUT-UBX_NAV_CLOCK_UART1: 1
+
+RESPONSE (GNSS → Host):
+  ACK-ACK: Acknowledged CFG-VALSET
+  Raw: B5 62 05 01 02 00 06 8A 98 C1
+
+------------------------------------------------------------------------------------------
+
+[18] ===== CFG-VALSET =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x8A  Payload Length: 9
+  Raw: B5 62 06 8A 09 00 00 01 00 00 A5 02 91 20 01 F3 66
+  Key-Value pairs:
+    CFG-MSGOUT-UBX_RXM_RAWX_UART1: 1
+
+RESPONSE (GNSS → Host):
+  ACK-ACK: Acknowledged CFG-VALSET
+  Raw: B5 62 05 01 02 00 06 8A 98 C1
+
+------------------------------------------------------------------------------------------
+
+[19] ===== CFG-VALSET =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x8A  Payload Length: 9
+  Raw: B5 62 06 8A 09 00 00 01 00 00 32 02 91 20 01 80 27
+  Key-Value pairs:
+    CFG-MSGOUT-UBX_RXM_SFRBX_UART1: 1
+
+RESPONSE (GNSS → Host):
+  ACK-ACK: Acknowledged CFG-VALSET
+  Raw: B5 62 05 01 02 00 06 8A 98 C1
+
+------------------------------------------------------------------------------------------
+
+[20] ===== CFG-VALSET =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x8A  Payload Length: 9
+  Raw: B5 62 06 8A 09 00 00 01 00 00 5A 03 91 20 01 A9 F3
+  Key-Value pairs:
+    CFG-MSGOUT-UBX_MON_RF_UART1: 1
+
+RESPONSE (GNSS → Host):
+  ACK-ACK: Acknowledged CFG-VALSET
+  Raw: B5 62 05 01 02 00 06 8A 98 C1
+
+------------------------------------------------------------------------------------------
+
+[21] ===== CFG-VALSET =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x8A  Payload Length: 96
+  Raw: B5 62 06 8A 60 00 00 01 00 00 AB 00 11 20 00 AA 00 11 20 00 C4 00 11 20 3C 21 00 11 20 07 11 00 11 20 03 C1 00 11 40 00 00 00 00 C2 00 11 40 10 27 00 00 A4 00 11 20 05 B3 00 11 30 64 00 B1 00 11 30 FA 00 3B 00 25 30 00 00 38 00 25 20 00 B4 00 11 30 5E 01 B5 00 11 30 96 00 B2 00 11 30 FA 00 1C 00 11 20 00 18 B3
+  Key-Value pairs:
+    CFG-NAVSPG-INFIL_CNOTHRS: 0
+    CFG-NAVSPG-INFIL_NCNOTHRS: 0
+    CFG-NAVSPG-CONSTR_DGNSSTO: 60
+    CFG-NAVSPG-DYNMODEL: 7
+    CFG-NAVSPG-FIXMODE: 3
+    CFG-NAVSPG-CONSTR_ALT: 0
+    CFG-NAVSPG-CONSTR_ALTVAR: 10000
+    CFG-NAVSPG-INFIL_MINELEV: 5
+    CFG-NAVSPG-OUTFIL_PACC: 100
+    CFG-NAVSPG-OUTFIL_PDOP: 250
+    0x3025003B: 0
+    CFG-MOT-GNSSSPEED_THRS: 0
+    CFG-NAVSPG-OUTFIL_TACC: 350
+    CFG-NAVSPG-OUTFIL_FACC: 150
+    CFG-NAVSPG-OUTFIL_TDOP: 250
+    CFG-NAVSPG-UTCSTANDARD: 0
+
+RESPONSE (GNSS → Host):
+  ACK-ACK: Acknowledged CFG-VALSET
+  Raw: B5 62 05 01 02 00 06 8A 98 C1
+
+------------------------------------------------------------------------------------------
+
+[22] ===== CFG-VALSET =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x8A  Payload Length: 51
+  Raw: B5 62 06 8A 33 00 00 01 00 00 01 00 23 10 01 02 00 23 30 64 00 13 00 11 10 01 25 00 11 10 01 A1 00 11 20 03 A2 00 11 20 20 A3 00 11 20 19 D6 00 11 20 00 17 00 11 30 64 08 AE A1
+  Key-Value pairs:
+    CFG-ANA-USE_ANA: 1
+    CFG-ANA-ORBMAXERR: 100
+    CFG-NAVSPG-INIFIX3D: 1
+    CFG-NAVSPG-ACKAIDING: 1
+    CFG-NAVSPG-INFIL_MINSVS: 3
+    CFG-NAVSPG-INFIL_MAXSVS: 32
+    CFG-NAVSPG-INFIL_MINCNO: 25
+    CFG-NAVSPG-SIGATTCOMP: 0
+    CFG-NAVSPG-WKNROLLOVER: 2148
+
+RESPONSE (GNSS → Host):
+  ACK-ACK: Acknowledged CFG-VALSET
+  Raw: B5 62 05 01 02 00 06 8A 98 C1
+
+------------------------------------------------------------------------------------------
+
+[23] ===== CFG-VALSET =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x8A  Payload Length: 21
+  Raw: B5 62 06 8A 15 00 00 01 00 00 01 00 21 30 C8 00 02 00 21 30 01 00 03 00 21 20 00 58 BD
+  Key-Value pairs:
+    CFG-RATE-MEAS: 200
+    CFG-RATE-NAV: 1
+    CFG-RATE-TIMEREF: 0
+
+RESPONSE (GNSS → Host):
+  ACK-ACK: Acknowledged CFG-VALSET
+  Raw: B5 62 05 01 02 00 06 8A 98 C1
+
+------------------------------------------------------------------------------------------
+
+[24] ===== CFG-VALSET =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x8A  Payload Length: 9
+  Raw: B5 62 06 8A 09 00 00 01 00 00 16 00 91 20 01 62 93
+  Key-Value pairs:
+    CFG-MSGOUT-UBX_NAV_SAT_UART1: 1
+
+RESPONSE (GNSS → Host):
+  ACK-ACK: Acknowledged CFG-VALSET
+  Raw: B5 62 05 01 02 00 06 8A 98 C1
+
+------------------------------------------------------------------------------------------
+
+[25] ===== CFG-VALSET =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x8A  Payload Length: 36
+  Raw: B5 62 06 8A 24 00 00 01 00 00 02 00 36 10 00 03 00 36 10 01 04 00 36 10 00 05 00 36 10 00 06 00 36 50 00 00 00 00 00 00 00 00 68 56
+  Key-Value pairs:
+    CFG-SEC-DATAINTERFA: 0
+    CFG-SEC-CFGINTERFLOCK: 1
+    CFG-SEC-CFGOTPLOCK: 0
+    CFG-SEC-PROTMAXNUM: 0
+    CFG-SEC-PROTCONFIG: 0
+
+RESPONSE (GNSS → Host):
+  ACK-ACK: Acknowledged CFG-VALSET
+  Raw: B5 62 05 01 02 00 06 8A 98 C1
+
+------------------------------------------------------------------------------------------
+
+[26] ===== CFG-VALSET =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x8A  Payload Length: 130
+  Raw: B5 62 06 8A 82 00 00 01 00 00 07 00 05 10 01 0A 00 05 10 01 01 00 05 30 32 00 02 00 05 40 40 42 0F 00 24 00 05 40 01 00 00 00 03 00 05 40 40 42 0F 00 25 00 05 40 01 00 00 00 0C 00 05 20 01 23 00 05 20 00 30 00 05 20 01 08 00 05 10 01 09 00 05 10 01 0B 00 05 10 01 04 00 05 40 A0 86 01 00 2A 00 05 50 00 00 00 00 00 00 24 40 05 00 05 40 A0 86 01 00 2B 00 05 50 00 00 00 00 00 00 24 40 06 00 05 40 00 00 00 00 5F 26
+  Key-Value pairs:
+    CFG-TP-POL: 1
+    CFG-TP-SYNC_GNSS: 1
+    CFG-TP-DRSTR_TIMESTR: 50
+    CFG-TP-PERIOD: 1000000
+    CFG-TP-USER_DELAY_ENA: 1
+    CFG-TP-PERIOD_LOCK: 1000000
+    CFG-TP-USER_DELAY_VALUE: 1
+    CFG-TP-ALIGN_TO: 1
+    CFG-TP-TP1_ENA: 0
+    CFG-TP-DRSTR_LEN: 1
+    CFG-TP-TIMEGRID_GPS: 1
+    CFG-TP-TIMEGRID_GLO: 1
+    CFG-TP-USE_LOCKED_TP1: 1
+    CFG-TP-FREQ_LOCK: 100000
+    CFG-TP-ANT_CABLEDELAY: 4621819117588971520
+    CFG-TP-FREQ: 100000
+    CFG-TP-ANT_RFGROUPDELAY: 4621819117588971520
+    CFG-TP-LEN_LOCK: 0
+
+RESPONSE (GNSS → Host):
+  ACK-ACK: Acknowledged CFG-VALSET
+  Raw: B5 62 05 01 02 00 06 8A 98 C1
+
+------------------------------------------------------------------------------------------
+
+[27] ===== CFG-VALSET =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x8A  Payload Length: 29
+  Raw: B5 62 06 8A 1D 00 00 01 00 00 10 00 41 20 01 01 00 41 20 03 02 00 41 20 0F 0D 00 41 10 01 13 00 41 10 01 BB AA
+  Key-Value pairs:
+    CFG-PM-POSUPDATEPERIOD: 1
+    CFG-PM-OPERATEMODE: 3
+    CFG-PM-ONTIME: 15
+    CFG-PM-EXTINTWAKE: 1
+    CFG-PM-WAITTIMEFIX: 1
+
+RESPONSE (GNSS → Host):
+  ACK-ACK: Acknowledged CFG-VALSET
+  Raw: B5 62 05 01 02 00 06 8A 98 C1
+
+------------------------------------------------------------------------------------------
+
+[28] ===== CFG-VALSET =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x8A  Payload Length: 9
+  Raw: B5 62 06 8A 09 00 00 01 00 00 7A 00 91 20 01 C6 87
+  Key-Value pairs:
+    CFG-MSGOUT-UBX_NAV_AOPSTATUS_UART1: 1
+
+RESPONSE (GNSS → Host):
+  ACK-ACK: Acknowledged CFG-VALSET
+  Raw: B5 62 05 01 02 00 06 8A 98 C1
+
+------------------------------------------------------------------------------------------
+
+[29] ===== CFG-VALSET =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x8A  Payload Length: 9
+  Raw: B5 62 06 8A 09 00 00 02 00 00 01 00 04 10 00 B0 6A
+  Key-Value pairs:
+    CFG-INFMSG-UBX_USB: 0
+
+RESPONSE (GNSS → Host):
+  ACK-ACK: Acknowledged CFG-VALSET
+  Raw: B5 62 05 01 02 00 06 8A 98 C1
+
+------------------------------------------------------------------------------------------
+
+[30] ===== CFG-VALSET =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x8A  Payload Length: 9
+  Raw: B5 62 06 8A 09 00 00 03 00 00 4B 03 91 20 04 9F BB
+  Key-Value pairs:
+    CFG-MSGOUT-UBX_SEC_ECSIGN_UART1: 4
+
+RESPONSE (GNSS → Host):
+  ACK-ACK: Acknowledged CFG-VALSET
+  Raw: B5 62 05 01 02 00 06 8A 98 C1
+
+------------------------------------------------------------------------------------------
+
+[31] ===== CFG-CFG =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x09  Payload Length: 13
+  Raw: B5 62 06 09 0D 00 00 00 00 00 FF FF 00 00 00 00 00 00 01 1B A9
+  Clear mask: 00 00 00 00
+  Save mask:  FF FF 00 00
+  Load mask:  00 00 00 00
+
+RESPONSE (GNSS → Host):
+  (No response found)
+
+------------------------------------------------------------------------------------------
+
+[32] ===== CFG-VALSET =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x8A  Payload Length: 36
+  Raw: B5 62 06 8A 24 00 01 02 00 00 01 00 A4 40 00 B0 71 0B 03 00 A4 40 00 B0 71 0B 05 00 A4 40 00 B0 71 0B 0A 00 A4 40 00 D8 B8 05 73 14
+  Key-Value pairs:
+    CFG-HW-ANT_CFG_VOLTCTRL: 192000000
+    CFG-HW-ANT_CFG_SHORTDET: 192000000
+    CFG-HW-ANT_CFG_OPENDET: 192000000
+    CFG-HW-ANT_CFG_PWRDOWN: 96000000
+
+RESPONSE (GNSS → Host):
+  ACK-ACK: Acknowledged CFG-VALSET
+  Raw: B5 62 05 01 02 00 06 8A 98 C1
+
+------------------------------------------------------------------------------------------
+
+[33] ===== CFG-RST =====
+
+REQUEST (Host → GNSS):
+  Class: 0x06  ID: 0x04  Payload Length: 4
+  Raw: B5 62 06 04 04 00 00 00 01 00 0F 66
+
+RESPONSE (GNSS → Host):
+  (No response found)
+
+------------------------------------------------------------------------------------------
+
+[34] ===== SEC-UNIQID =====
+
+REQUEST (Host → GNSS):
+  Class: 0x27  ID: 0x03  Payload Length: 0
+  Raw: B5 62 27 03 00 00 2A A5
+
+RESPONSE (GNSS → Host):
+  (No response found)
+
+------------------------------------------------------------------------------------------
+
+
+==========================================================================================
+SUMMARY
+==========================================================================================
+Total TX messages: 34
+Total RX messages: 6693
+Configuration commands extracted: 34
