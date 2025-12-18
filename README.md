@@ -10,14 +10,20 @@
 - `UBX-NAV-PVT` (Position Velocity Time) - основное сообщение, 5 Hz
 - `UBX-NAV-POSECEF` (Position ECEF) - координаты в ECEF
 - `UBX-NAV-POSLLH` (Position LLH) - координаты широта/долгота/высота
+- `UBX-NAV-HPPOSECEF` (High Precision ECEF) - высокоточные координаты ECEF
 - `UBX-NAV-STATUS` - статус навигации
 - `UBX-NAV-DOP` (Dilution of Precision) - точность позиционирования
+- `UBX-NAV-COV` (Covariance) - ковариационная матрица позиции
 - `UBX-NAV-VELNED` - скорость в NED координатах
+- `UBX-NAV-VELECEF` - скорость в ECEF координатах
 - `UBX-NAV-TIMEUTC` - время UTC
+- `UBX-NAV-TIMEGPS` - время GPS
+- `UBX-NAV-TIMELS` - информация о високосной секунде
 - `UBX-NAV-CLOCK` - синхронизация часов
 - `UBX-NAV-SAT` - информация о спутниках (M10)
 - `UBX-NAV-SVINFO` - информация о спутниках (M8, устаревшее)
 - `UBX-NAV-AOPSTATUS` - статус AssistNow Autonomous
+- `UBX-NAV-EOE` (End of Epoch) - маркер конца эпохи навигации
 
 **Сообщения приёмника (RXM):**
 - `UBX-RXM-RAWX` - сырые измерения GNSS
@@ -26,13 +32,18 @@
 - `UBX-MON-VER` - версия прошивки (эмуляция M8 или M10)
 - `UBX-MON-HW` - статус аппаратуры
 - `UBX-MON-COMMS` - статус коммуникаций
+- `UBX-MON-RF` - информация о радиочастотном блоке
 
 **Время (TIM):**
 - `UBX-TIM-TP` - сообщение временного импульса
 
 **Безопасность (SEC):**
 - `UBX-SEC-SIGN` - ECDSA подпись (SECP192R1) для аутентификации данных
-- `UBX-SEC-UNIQID` - уникальный ID чипа
+- `UBX-SEC-UNIQID` - уникальный ID чипа (poll/response)
+
+**Подтверждение (ACK):**
+- `UBX-ACK-ACK` - подтверждение успешного выполнения команды
+- Отправляется в ответ на все поддерживаемые CFG команды
 
 ### Конфигурационные команды (CFG)
 
@@ -40,7 +51,7 @@
 
 | Команда | Class | ID | Описание |
 |---------|-------|-----|----------|
-| `CFG-PRT` | 0x06 | 0x00 | Настройка порта и скорости UART (9600, 115200, 460800) |
+| `CFG-PRT` | 0x06 | 0x00 | Настройка порта и скорости UART (любая скорость) |
 | `CFG-RATE` | 0x06 | 0x08 | Настройка частоты навигационных сообщений |
 | `CFG-MSG` | 0x06 | 0x01 | Включение/отключение отдельных сообщений |
 | `CFG-NAV5` | 0x06 | 0x24 | Настройки навигационного движка |
@@ -78,9 +89,9 @@
 Эмулятор поддерживает динамическую настройку во время работы:
 
 - **Переключение скорости UART:**
-  - 9600 бод
+  - Любая скорость (задаётся через CFG-PRT)
   - 115200 бод (по умолчанию)
-  - 460800 бод
+  - Типичные значения: 9600, 38400, 115200, 230400, 460800
   - Изменяется через команду `UBX-CFG-PRT`
 
 - **Настройка частоты сообщений:**
@@ -204,8 +215,8 @@ B5 62 06 01 03 00 01 07 01 [CRC]
 
 ### FreeRTOS таймеры (Core0)
 
-- **Timer_5Hz:** генерация NAV сообщений (PVT, POSECEF, POSLLH, STATUS, DOP, VELNED, TIMEUTC, CLOCK, SAT, AOPSTATUS, RXM-RAWX) - 200 мс
-- **Timer_1Hz:** генерация MON сообщений (COMMS, HW, SVINFO) + проверка SEC-SIGN ready - 1000 мс
+- **Timer_5Hz:** генерация NAV сообщений (PVT, POSECEF, POSLLH, HPPOSECEF, STATUS, DOP, COV, VELNED, VELECEF, TIMEUTC, TIMEGPS, TIMELS, CLOCK, SAT, AOPSTATUS, EOE, RXM-RAWX) - 200 мс
+- **Timer_1Hz:** генерация MON сообщений (COMMS, HW, RF, SVINFO) + TIM-TP + проверка SEC-SIGN ready - 1000 мс
 - **Timer_3sec:** первый SEC-SIGN запрос (one-shot)
 - **Timer_4sec:** периодический SEC-SIGN запрос
 - **Timer_msg_start:** задержка 1 сек после первого CFG-MSG (one-shot)
@@ -224,12 +235,10 @@ B5 62 06 01 03 00 01 07 01 [CRC]
 
 ### Управление скоростью UART
 
-Поддерживаемые скорости:
-- 9600 бод
-- 115200 бод (по умолчанию)
-- 460800 бод
+Поддерживаемые скорости: любое значение baud rate.
+По умолчанию: 115200 бод.
 
-Переключение выполняется через команду `UBX-CFG-PRT`.
+Переключение выполняется через команду `UBX-CFG-PRT` - эмулятор читает 32-битное значение baudrate из payload и применяет его немедленно.
 
 ## Структура проекта
 
@@ -246,6 +255,10 @@ ublox_fake_unified/
 │   ├── sha256.c/h           # SHA-256 хеширование
 │   ├── ws2812.pio           # PIO программа для RGB LED
 │   └── uart_rx.pio          # PIO программа для UART passthrough
+├── docs/
+│   ├── air3s_2_reference.txt     # Эталонная конфигурация M10
+│   ├── m10_config_messages.txt   # CFG команды реального M10
+│   └── implementation_gaps.md    # Анализ пробелов реализации
 ├── lib/
 │   └── micro-ecc/           # Библиотека ECDSA криптографии
 └── FreeRTOS/                # FreeRTOS ядро
