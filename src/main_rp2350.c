@@ -231,85 +231,100 @@ void secunda(void) {
                    UBX_NAV_PVT[7] << 8 | UBX_NAV_PVT[6];
     val = val + 200;
 
-    // Update iTOW in all NAV messages
-    UBX_NAV_PVT[6] = val; UBX_NAV_PVT[7] = val >> 8;
-    UBX_NAV_PVT[8] = val >> 16; UBX_NAV_PVT[9] = val >> 24;
-
-    UBX_NAV_POSECEF[6] = val; UBX_NAV_POSECEF[7] = val >> 8;
-    UBX_NAV_POSECEF[8] = val >> 16; UBX_NAV_POSECEF[9] = val >> 24;
-
-    UBX_NAV_POSLLH[6] = val; UBX_NAV_POSLLH[7] = val >> 8;
-    UBX_NAV_POSLLH[8] = val >> 16; UBX_NAV_POSLLH[9] = val >> 24;
-
-    UBX_NAV_STATUS[6] = val; UBX_NAV_STATUS[7] = val >> 8;
-    UBX_NAV_STATUS[8] = val >> 16; UBX_NAV_STATUS[9] = val >> 24;
-
-    UBX_NAV_DOP[6] = val; UBX_NAV_DOP[7] = val >> 8;
-    UBX_NAV_DOP[8] = val >> 16; UBX_NAV_DOP[9] = val >> 24;
-
-    UBX_NAV_VELNED[6] = val; UBX_NAV_VELNED[7] = val >> 8;
-    UBX_NAV_VELNED[8] = val >> 16; UBX_NAV_VELNED[9] = val >> 24;
-
-    UBX_NAV_TIMEUTC[6] = val; UBX_NAV_TIMEUTC[7] = val >> 8;
-    UBX_NAV_TIMEUTC[8] = val >> 16; UBX_NAV_TIMEUTC[9] = val >> 24;
-
-    UBX_NAV_CLOCK[6] = val; UBX_NAV_CLOCK[7] = val >> 8;
-    UBX_NAV_CLOCK[8] = val >> 16; UBX_NAV_CLOCK[9] = val >> 24;
-
-    UBX_NAV_SAT[6] = val; UBX_NAV_SAT[7] = val >> 8;
-    UBX_NAV_SAT[8] = val >> 16; UBX_NAV_SAT[9] = val >> 24;
-
-    UBX_NAV_AOPSTATUS[6] = val; UBX_NAV_AOPSTATUS[7] = val >> 8;
-    UBX_NAV_AOPSTATUS[8] = val >> 16; UBX_NAV_AOPSTATUS[9] = val >> 24;
-
-    // Legacy messages (if enabled)
-    UBX_NAV_SVINFO[6] = val; UBX_NAV_SVINFO[7] = val >> 8;
-    UBX_NAV_SVINFO[8] = val >> 16; UBX_NAV_SVINFO[9] = val >> 24;
-
-    Timepulse[6] = val; Timepulse[7] = val >> 8;
-    Timepulse[8] = val >> 16; Timepulse[9] = val >> 24;
-
-    // New M10 messages - update iTOW
-    UBX_NAV_EOE[6] = val; UBX_NAV_EOE[7] = val >> 8;
-    UBX_NAV_EOE[8] = val >> 16; UBX_NAV_EOE[9] = val >> 24;
-
-    UBX_NAV_TIMEGPS[6] = val; UBX_NAV_TIMEGPS[7] = val >> 8;
-    UBX_NAV_TIMEGPS[8] = val >> 16; UBX_NAV_TIMEGPS[9] = val >> 24;
-
-    UBX_NAV_VELECEF[6] = val; UBX_NAV_VELECEF[7] = val >> 8;
-    UBX_NAV_VELECEF[8] = val >> 16; UBX_NAV_VELECEF[9] = val >> 24;
-
-    UBX_NAV_TIMELS[6] = val; UBX_NAV_TIMELS[7] = val >> 8;
-    UBX_NAV_TIMELS[8] = val >> 16; UBX_NAV_TIMELS[9] = val >> 24;
-
-    UBX_NAV_COV[6] = val; UBX_NAV_COV[7] = val >> 8;
-    UBX_NAV_COV[8] = val >> 16; UBX_NAV_COV[9] = val >> 24;
-
-    // UBX_NAV_HPPOSECEF has iTOW at offset 10
-    UBX_NAV_HPPOSECEF[10] = val; UBX_NAV_HPPOSECEF[11] = val >> 8;
-    UBX_NAV_HPPOSECEF[12] = val >> 16; UBX_NAV_HPPOSECEF[13] = val >> 24;
-
-    // Recalculate CRC for all messages
-    CRC_gen(UBX_NAV_PVT, sizeof(UBX_NAV_PVT));
-    CRC_gen(UBX_NAV_POSECEF, sizeof(UBX_NAV_POSECEF));
-    CRC_gen(UBX_NAV_POSLLH, sizeof(UBX_NAV_POSLLH));
-    CRC_gen(UBX_NAV_STATUS, sizeof(UBX_NAV_STATUS));
-    CRC_gen(UBX_NAV_DOP, sizeof(UBX_NAV_DOP));
-    CRC_gen(UBX_NAV_VELNED, sizeof(UBX_NAV_VELNED));
-    CRC_gen(UBX_NAV_TIMEUTC, sizeof(UBX_NAV_TIMEUTC));
-    CRC_gen(UBX_NAV_CLOCK, sizeof(UBX_NAV_CLOCK));
-    CRC_gen(UBX_NAV_SAT, sizeof(UBX_NAV_SAT));
-    CRC_gen(UBX_NAV_AOPSTATUS, sizeof(UBX_NAV_AOPSTATUS));
-    CRC_gen(UBX_RXM_RAWX, sizeof(UBX_RXM_RAWX));
-    CRC_gen(UBX_NAV_SVINFO, sizeof(UBX_NAV_SVINFO));
-    CRC_gen(Timepulse, sizeof(Timepulse));
-    // New M10 messages CRC
-    CRC_gen(UBX_NAV_EOE, sizeof(UBX_NAV_EOE));
-    CRC_gen(UBX_NAV_TIMEGPS, sizeof(UBX_NAV_TIMEGPS));
-    CRC_gen(UBX_NAV_VELECEF, sizeof(UBX_NAV_VELECEF));
-    CRC_gen(UBX_NAV_TIMELS, sizeof(UBX_NAV_TIMELS));
-    CRC_gen(UBX_NAV_COV, sizeof(UBX_NAV_COV));
-    CRC_gen(UBX_NAV_HPPOSECEF, sizeof(UBX_NAV_HPPOSECEF));
+    // Update iTOW and CRC only for enabled messages
+    if (UBX_NAV_PVT_fl) {
+        UBX_NAV_PVT[6] = val; UBX_NAV_PVT[7] = val >> 8;
+        UBX_NAV_PVT[8] = val >> 16; UBX_NAV_PVT[9] = val >> 24;
+        CRC_gen(UBX_NAV_PVT, sizeof(UBX_NAV_PVT));
+    }
+    if (UBX_NAV_POSECEF_fl) {
+        UBX_NAV_POSECEF[6] = val; UBX_NAV_POSECEF[7] = val >> 8;
+        UBX_NAV_POSECEF[8] = val >> 16; UBX_NAV_POSECEF[9] = val >> 24;
+        CRC_gen(UBX_NAV_POSECEF, sizeof(UBX_NAV_POSECEF));
+    }
+    if (UBX_NAV_POSLLH_fl) {
+        UBX_NAV_POSLLH[6] = val; UBX_NAV_POSLLH[7] = val >> 8;
+        UBX_NAV_POSLLH[8] = val >> 16; UBX_NAV_POSLLH[9] = val >> 24;
+        CRC_gen(UBX_NAV_POSLLH, sizeof(UBX_NAV_POSLLH));
+    }
+    if (UBX_NAV_STATUS_fl) {
+        UBX_NAV_STATUS[6] = val; UBX_NAV_STATUS[7] = val >> 8;
+        UBX_NAV_STATUS[8] = val >> 16; UBX_NAV_STATUS[9] = val >> 24;
+        CRC_gen(UBX_NAV_STATUS, sizeof(UBX_NAV_STATUS));
+    }
+    if (UBX_NAV_DOP_fl) {
+        UBX_NAV_DOP[6] = val; UBX_NAV_DOP[7] = val >> 8;
+        UBX_NAV_DOP[8] = val >> 16; UBX_NAV_DOP[9] = val >> 24;
+        CRC_gen(UBX_NAV_DOP, sizeof(UBX_NAV_DOP));
+    }
+    if (UBX_NAV_VELNED_fl) {
+        UBX_NAV_VELNED[6] = val; UBX_NAV_VELNED[7] = val >> 8;
+        UBX_NAV_VELNED[8] = val >> 16; UBX_NAV_VELNED[9] = val >> 24;
+        CRC_gen(UBX_NAV_VELNED, sizeof(UBX_NAV_VELNED));
+    }
+    if (UBX_NAV_TIMEUTC_fl) {
+        UBX_NAV_TIMEUTC[6] = val; UBX_NAV_TIMEUTC[7] = val >> 8;
+        UBX_NAV_TIMEUTC[8] = val >> 16; UBX_NAV_TIMEUTC[9] = val >> 24;
+        CRC_gen(UBX_NAV_TIMEUTC, sizeof(UBX_NAV_TIMEUTC));
+    }
+    if (UBX_NAV_CLOCK_fl) {
+        UBX_NAV_CLOCK[6] = val; UBX_NAV_CLOCK[7] = val >> 8;
+        UBX_NAV_CLOCK[8] = val >> 16; UBX_NAV_CLOCK[9] = val >> 24;
+        CRC_gen(UBX_NAV_CLOCK, sizeof(UBX_NAV_CLOCK));
+    }
+    if (UBX_NAV_SAT_fl) {
+        UBX_NAV_SAT[6] = val; UBX_NAV_SAT[7] = val >> 8;
+        UBX_NAV_SAT[8] = val >> 16; UBX_NAV_SAT[9] = val >> 24;
+        CRC_gen(UBX_NAV_SAT, sizeof(UBX_NAV_SAT));
+    }
+    if (UBX_NAV_AOPSTATUS_fl) {
+        UBX_NAV_AOPSTATUS[6] = val; UBX_NAV_AOPSTATUS[7] = val >> 8;
+        UBX_NAV_AOPSTATUS[8] = val >> 16; UBX_NAV_AOPSTATUS[9] = val >> 24;
+        CRC_gen(UBX_NAV_AOPSTATUS, sizeof(UBX_NAV_AOPSTATUS));
+    }
+    if (UBX_RXM_RAWX_fl) {
+        CRC_gen(UBX_RXM_RAWX, sizeof(UBX_RXM_RAWX));
+    }
+    if (UBX_NAV_SVINFO_fl) {
+        UBX_NAV_SVINFO[6] = val; UBX_NAV_SVINFO[7] = val >> 8;
+        UBX_NAV_SVINFO[8] = val >> 16; UBX_NAV_SVINFO[9] = val >> 24;
+        CRC_gen(UBX_NAV_SVINFO, sizeof(UBX_NAV_SVINFO));
+    }
+    if (timepulse_fl) {
+        Timepulse[6] = val; Timepulse[7] = val >> 8;
+        Timepulse[8] = val >> 16; Timepulse[9] = val >> 24;
+        CRC_gen(Timepulse, sizeof(Timepulse));
+    }
+    if (UBX_NAV_EOE_fl) {
+        UBX_NAV_EOE[6] = val; UBX_NAV_EOE[7] = val >> 8;
+        UBX_NAV_EOE[8] = val >> 16; UBX_NAV_EOE[9] = val >> 24;
+        CRC_gen(UBX_NAV_EOE, sizeof(UBX_NAV_EOE));
+    }
+    if (UBX_NAV_TIMEGPS_fl) {
+        UBX_NAV_TIMEGPS[6] = val; UBX_NAV_TIMEGPS[7] = val >> 8;
+        UBX_NAV_TIMEGPS[8] = val >> 16; UBX_NAV_TIMEGPS[9] = val >> 24;
+        CRC_gen(UBX_NAV_TIMEGPS, sizeof(UBX_NAV_TIMEGPS));
+    }
+    if (UBX_NAV_VELECEF_fl) {
+        UBX_NAV_VELECEF[6] = val; UBX_NAV_VELECEF[7] = val >> 8;
+        UBX_NAV_VELECEF[8] = val >> 16; UBX_NAV_VELECEF[9] = val >> 24;
+        CRC_gen(UBX_NAV_VELECEF, sizeof(UBX_NAV_VELECEF));
+    }
+    if (UBX_NAV_TIMELS_fl) {
+        UBX_NAV_TIMELS[6] = val; UBX_NAV_TIMELS[7] = val >> 8;
+        UBX_NAV_TIMELS[8] = val >> 16; UBX_NAV_TIMELS[9] = val >> 24;
+        CRC_gen(UBX_NAV_TIMELS, sizeof(UBX_NAV_TIMELS));
+    }
+    if (UBX_NAV_COV_fl) {
+        UBX_NAV_COV[6] = val; UBX_NAV_COV[7] = val >> 8;
+        UBX_NAV_COV[8] = val >> 16; UBX_NAV_COV[9] = val >> 24;
+        CRC_gen(UBX_NAV_COV, sizeof(UBX_NAV_COV));
+    }
+    if (UBX_NAV_HPPOSECEF_fl) {
+        UBX_NAV_HPPOSECEF[10] = val; UBX_NAV_HPPOSECEF[11] = val >> 8;
+        UBX_NAV_HPPOSECEF[12] = val >> 16; UBX_NAV_HPPOSECEF[13] = val >> 24;
+        CRC_gen(UBX_NAV_HPPOSECEF, sizeof(UBX_NAV_HPPOSECEF));
+    }
 }
 
 void secunda2(void) {
@@ -408,12 +423,14 @@ void sec_sign_send(void) {
 // ============================================================================
 
 int pico_rng(uint8_t *dest, unsigned size) {
+    // Optimized RNG: collect 32 random bits, XOR-fold to 8 bits for better entropy
     for (unsigned i = 0; i < size; i++) {
-        uint8_t byte = 0;
-        for (int j = 0; j < 8; j++) {
-            byte = (byte << 1) | (rosc_hw->randombit & 1);
+        uint32_t r = 0;
+        for (int j = 0; j < 32; j++) {
+            r = (r << 1) | (rosc_hw->randombit & 1);
         }
-        dest[i] = byte;
+        // XOR-fold 32 bits into 8 bits for better distribution
+        dest[i] = (r ^ (r >> 8) ^ (r >> 16) ^ (r >> 24)) & 0xFF;
     }
     return 1;
 }
@@ -701,7 +718,6 @@ void on_uart_rx0(void) {
 
     // UBX-MON-VER (0x0A 0x04) - Version request
     if (flag == 0 && RxData[2] == 0x0A && RxData[3] == 0x04) {
-        busy_wait_us(350);
         uart_write_blocking(uart0, monitor_ver_M10, sizeof(monitor_ver_M10));
         otvet++;
     }
@@ -715,7 +731,6 @@ void on_uart_rx0(void) {
         if (baudrate > 0) {
             skorost_uart_0 = baudrate;
             uart_set_baudrate(uart0, skorost_uart_0);
-            busy_wait_ms(1);
             uart_write_blocking(uart0, mes_1, sizeof(mes_1));
             otvet++;
         } else {
@@ -731,49 +746,42 @@ void on_uart_rx0(void) {
     if (count >= 14 && RxData[2] == 0x06 && RxData[3] == 0x08 && RxData[4] == 0x06) {
         int16_t period = RxData[7] << 8 | RxData[6];  // 16-bit period in ms
         xTimerChangePeriod(TTimer_10hz, pdMS_TO_TICKS(period), 0);
-        busy_wait_us(350);
         uart_write_blocking(uart0, mes_2, sizeof(mes_2));
         otvet++;
     }
 
     // UBX-CFG-CFG (0x06 0x09) - Configuration save/load/clear
     if (RxData[2] == 0x06 && RxData[3] == 0x09) {
-        busy_wait_us(350);
         uart_write_blocking(uart0, UBX_CFG_CFG, sizeof(UBX_CFG_CFG));
         otvet++;
     }
 
     // UBX-CFG-NAV5 (0x06 0x24) - Navigation engine settings
     if (RxData[2] == 0x06 && RxData[3] == 0x24) {
-        busy_wait_us(350);
         uart_write_blocking(uart0, mes_3, sizeof(mes_3));
         otvet++;
     }
 
     // UBX-CFG-NAVX5 (0x06 0x23) - Navigation engine expert settings
     if (RxData[2] == 0x06 && RxData[3] == 0x23) {
-        busy_wait_us(350);
         uart_write_blocking(uart0, mes_4, sizeof(mes_4));
         otvet++;
     }
 
     // UBX-CFG-GNSS (0x06 0x3E) - GNSS system configuration
     if (RxData[2] == 0x06 && RxData[3] == 0x3E) {
-        busy_wait_us(350);
         uart_write_blocking(uart0, mes_5, sizeof(mes_5));
         otvet++;
     }
 
     // UBX-CFG-PMS (0x06 0x86) - Power management settings
     if (RxData[2] == 0x06 && RxData[3] == 0x86) {
-        busy_wait_us(350);
         uart_write_blocking(uart0, mes_6, sizeof(mes_6));
         otvet++;
     }
 
     // UBX-CFG-MSG (0x06 0x01) - Message configuration (needs 11+ bytes)
     if (count >= 11 && RxData[2] == 0x06 && RxData[3] == 0x01) {
-        busy_wait_us(250);
         uart_write_blocking(uart0, mes_7, sizeof(mes_7));
         otvet++;
 
@@ -896,7 +904,6 @@ void on_uart_rx0(void) {
         }
 
         // Send ACK for CFG-VALSET
-        busy_wait_us(350);
         uart_write_blocking(uart0, UBX_CFG_VALSET, sizeof(UBX_CFG_VALSET));
         otvet++;
 
@@ -910,7 +917,6 @@ void on_uart_rx0(void) {
     if (count >= 8 && RxData[2] == 0x27 && RxData[3] == 0x03) {
         uint16_t payload_len = RxData[4] | (RxData[5] << 8);
         if (payload_len == 0) {  // Poll request (no payload)
-            busy_wait_us(350);
             uart_write_blocking(uart0, UBX_SEC_UNIQID, sizeof(UBX_SEC_UNIQID));
             otvet++;
         }
