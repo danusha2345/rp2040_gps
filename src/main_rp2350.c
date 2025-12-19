@@ -27,6 +27,9 @@
 #include "hardware/clocks.h"
 #include "hardware/pio.h"
 #include "hardware/gpio.h"
+#include "hardware/flash.h"
+#include "hardware/structs/rosc.h"
+#include "pico/flash.h"
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -55,6 +58,10 @@
 #define Timer_1hz       pdMS_TO_TICKS(1000)
 #define Timer_3sec      pdMS_TO_TICKS(3000)   // First SEC-SIGN delay
 #define Timer_4sec      pdMS_TO_TICKS(4000)   // Subsequent SEC-SIGN period
+
+// Flash storage for persistent mode (last sector - safe location)
+#define FLASH_TARGET_OFFSET (PICO_FLASH_SIZE_BYTES - FLASH_SECTOR_SIZE)
+#define FLASH_MODE_MAGIC    0xDEADBEEF  // Magic number to verify valid data
 
 // ============================================================================
 // SEC-SIGN ECDSA private key (SECP192R1)
@@ -138,6 +145,7 @@ void callback_msg_start(TimerHandle_t xTimer);
 void vOneTimeTask(void *pvParameters);
 void sec_sign_accumulate(const uint8_t *msg, size_t len);
 void sec_sign_send(void);
+int pico_rng(uint8_t *dest, unsigned size);  // RNG for micro-ecc
 
 // ============================================================================
 // WS2812 LED functions
@@ -149,6 +157,53 @@ static inline void put_pixel(PIO pio, uint sm, uint32_t pixel_grb) {
 
 static inline uint32_t urgb_u32(uint8_t r, uint8_t g, uint8_t b) {
     return ((uint32_t)(r) << 8) | ((uint32_t)(g) << 16) | (uint32_t)(b);
+}
+
+// ============================================================================
+// Flash storage functions for persistent mode
+// ============================================================================
+
+// Structure stored in flash (must be aligned to FLASH_PAGE_SIZE for writing)
+typedef struct {
+    uint32_t magic;      // Magic number to verify valid data
+    uint8_t  mode;       // 0 = emulation (green), 1 = passthrough (blue)
+    uint8_t  reserved[3]; // Padding for alignment
+} flash_mode_data_t;
+
+// Callback for flash_safe_execute - erase sector
+static void flash_erase_callback(void *param) {
+    (void)param;
+    flash_range_erase(FLASH_TARGET_OFFSET, FLASH_SECTOR_SIZE);
+}
+
+// Callback for flash_safe_execute - program page
+static void flash_program_callback(void *param) {
+    const uint8_t *data = (const uint8_t *)param;
+    flash_range_program(FLASH_TARGET_OFFSET, data, FLASH_PAGE_SIZE);
+}
+
+// Save current mode to flash
+static void flash_save_mode(uint8_t mode) {
+    // Prepare data buffer (must be FLASH_PAGE_SIZE for programming)
+    uint8_t page_data[FLASH_PAGE_SIZE] = {0xFF};  // Initialize with erased state
+    flash_mode_data_t *data = (flash_mode_data_t *)page_data;
+    data->magic = FLASH_MODE_MAGIC;
+    data->mode = mode;
+
+    // Use flash_safe_execute to handle multicore safety
+    flash_safe_execute(flash_erase_callback, NULL, UINT32_MAX);
+    flash_safe_execute(flash_program_callback, page_data, UINT32_MAX);
+}
+
+// Load mode from flash, returns 0xFF if no valid data
+static uint8_t flash_load_mode(void) {
+    // Read directly from XIP flash memory
+    const flash_mode_data_t *data = (const flash_mode_data_t *)(XIP_BASE + FLASH_TARGET_OFFSET);
+
+    if (data->magic == FLASH_MODE_MAGIC) {
+        return data->mode;
+    }
+    return 0xFF;  // No valid data - use default
 }
 
 // ============================================================================
@@ -346,6 +401,21 @@ void sec_sign_send(void) {
     // Reset for next interval
     sha256_init(&sec_sign_sha256_ctx);
     sec_sign_packet_count = 0;
+}
+
+// ============================================================================
+// RNG for micro-ecc (uses hardware ROSC)
+// ============================================================================
+
+int pico_rng(uint8_t *dest, unsigned size) {
+    for (unsigned i = 0; i < size; i++) {
+        uint8_t byte = 0;
+        for (int j = 0; j < 8; j++) {
+            byte = (byte << 1) | (rosc_hw->randombit & 1);
+        }
+        dest[i] = byte;
+    }
+    return 1;
 }
 
 // ============================================================================
@@ -551,12 +621,16 @@ void gpio_6_on(uint gpio, uint32_t events) {
         gpio_set_function(PIO_OUT_PIN, PIO_FUNCSEL_NUM(pio_passthrough, PIO_OUT_PIN));
         pio_sm_set_enabled(pio_passthrough, sm_passthrough, true);
         flag_gpio6 = 0;
+        // Save passthrough mode (1) to flash
+        flash_save_mode(1);
     } else {
         // Switch to emulation mode
         r = 0; g = 100; b = 0;
         pio_sm_set_enabled(pio_passthrough, sm_passthrough, false);
         flag_gpio6 = 1;
         setup_uart0();
+        // Save emulation mode (0) to flash
+        flash_save_mode(0);
     }
 
     gpio_put(MODE_BTN_PWR, 1);
@@ -765,6 +839,8 @@ void on_uart_rx0(void) {
                     // ============= CORRECTED KEYS FROM REFERENCE (air3s_2_reference.txt) =============
                     // CFG-MSGOUT-UBX_NAV_PVT_UART1
                     case 0x20910007: UBX_NAV_PVT_fl = (val8 > 0); break;
+                    // CFG-MSGOUT-UBX_NAV_SVINFO_UART1
+                    case 0x2091000C: UBX_NAV_SVINFO_fl = (val8 > 0); break;
                     // CFG-MSGOUT-UBX_NAV_SAT_UART1
                     case 0x20910016: UBX_NAV_SAT_fl = (val8 > 0); break;
                     // CFG-MSGOUT-UBX_NAV_STATUS_UART1
@@ -865,6 +941,7 @@ int main(void) {
 
     // Initialize SEC-SIGN (always enabled, first at 3s, then every 4s)
     sha256_init(&sec_sign_sha256_ctx);
+    uECC_set_rng(&pico_rng);  // Set RNG for ECDSA signing
 
     // Create FreeRTOS timers
     TTimer_1hz = xTimerCreate("1Hz", Timer_1hz, pdTRUE, 0, callback_1hz);
@@ -881,15 +958,28 @@ int main(void) {
     xTimerStart(TTimer_10hz, 10);
     xTimerStart(TTimer_first_sec_sign, 0);  // First SEC-SIGN at 3s, then periodic 4s
 
-    // Create one-time UART init task
-    xTaskCreate(vOneTimeTask, "OneTimeTask", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
-
     // Initialize PIO passthrough program
     pio_claim_free_sm_and_add_program_for_gpio_range(&uart_rx_mini_program, &pio_passthrough,
                                                       &sm_passthrough, &offset_passthrough,
                                                       PIO_IN_PIN, PIO_OUT_PIN, true);
     uart_rx_mini_program_init(pio_passthrough, sm_passthrough, offset_passthrough,
                                PIO_IN_PIN, PIO_OUT_PIN, 3000000);
+
+    // Load saved mode from flash and configure accordingly
+    uint8_t saved_mode = flash_load_mode();
+    if (saved_mode == 1) {
+        // Restore passthrough mode
+        r = 0; g = 0; b = 100;
+        flag_gpio6 = 0;
+        gpio_set_function(PIO_OUT_PIN, PIO_FUNCSEL_NUM(pio_passthrough, PIO_OUT_PIN));
+        pio_sm_set_enabled(pio_passthrough, sm_passthrough, true);
+        // Don't initialize UART in passthrough mode
+    } else {
+        // Default: emulation mode - create UART init task
+        r = 0; g = 50; b = 0;
+        flag_gpio6 = 1;
+        xTaskCreate(vOneTimeTask, "OneTimeTask", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+    }
 
     // Start FreeRTOS scheduler
     vTaskStartScheduler();
