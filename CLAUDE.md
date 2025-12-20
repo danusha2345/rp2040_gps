@@ -52,7 +52,32 @@ Messages enabled/disabled via `volatile bool UBX_*_fl` flags. CRC recalculated w
 CFG commands handled in UART IRQ (`on_uart_rx0`):
 - `CFG-PRT` (0x06,0x00): baudrate change
 - `CFG-MSG` (0x06,0x01): enable/disable message types
+- `CFG-RATE` (0x06,0x08): NAV message rate configuration
 - `CFG-VALSET` (0x06,0x8A): M10 configuration
+
+## Dynamic NAV Rate Configuration
+
+NAV message period is dynamically configurable:
+- `nav_meas_period_ms` - measurement period (default 200ms)
+- `nav_rate` - cycles per navigation solution (default 1)
+- `nav_timeref` - time reference (stored but unused)
+
+**Effective period** = `nav_meas_period_ms × nav_rate`
+
+Updated via `update_nav_timer_period()` which calls `xTimerChangePeriod()`.
+
+## CFG-VALSET Keys Supported
+
+| Key | Description | Type |
+|-----|-------------|------|
+| `0x30210001` | CFG-RATE-MEAS (measurement period ms) | u16 |
+| `0x30210002` | CFG-RATE-NAV (cycles per solution) | u16 |
+| `0x20210003` | CFG-RATE-TIMEREF (time reference) | u8 |
+| `0x40520001` | CFG-UART1-BAUDRATE | u32 |
+| `0x20910007` | NAV-PVT enable | u8 |
+| `0x2091001B` | NAV-STATUS enable | u8 |
+| `0x20910039` | NAV-DOP enable | u8 |
+| ... | (see switch statement in `on_uart_rx0`) | |
 
 ## Hardware Pins
 
