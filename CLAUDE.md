@@ -98,10 +98,18 @@ Mode persists in flash (last sector). Button toggles mode.
 
 ## SEC-SIGN Cryptography
 
+- **SEC-SIGN message**: class 0x27, id 0x04 (108 bytes payload)
 - ECDSA SECP192R1 via micro-ecc library
 - Private key in `sec_sign_private_key[24]`
 - **ALL transmitted UBX messages accumulated in SHA256 context** (34 message types)
   - Includes: NAV-*, MON-*, RXM-*, TIM-*, ACK-*, CFG responses, SEC-UNIQID
-  - Excludes: SEC-SIGN itself (the signature message)
+  - Excludes: SEC-SIGN itself (0x27 0x04)
 - First signature at 3 seconds after startup, then every 4 seconds
 - Computation offloaded to Core1 (CPU-intensive ECDSA)
+
+**Critical: Atomic capture in `sec_sign_compute()`:**
+```c
+SHA256_CTX ctx_copy = sec_sign_sha256_ctx;
+uint16_t packet_count = sec_sign_packet_count;  // Must capture BOTH together!
+```
+This prevents race condition where Core0 increments counter after hash is copied.
