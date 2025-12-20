@@ -834,12 +834,21 @@ void on_uart_rx0(void) {
             if (i + val_size <= end && i + val_size <= count) {
                 uint8_t val8 = RxData[i];
                 uint16_t val16 = RxData[i] | (RxData[i+1] << 8);
+                uint32_t val32 = RxData[i] | (RxData[i+1] << 8) | (RxData[i+2] << 16) | (RxData[i+3] << 24);
 
                 switch (key) {
                     // CFG-RATE-MEAS (0x30210001) - measurement period in ms
                     case 0x30210001:
                         if (val16 >= 50 && val16 <= 10000) {
                             xTimerChangePeriod(TTimer_10hz, pdMS_TO_TICKS(val16), 0);
+                        }
+                        break;
+
+                    // CFG-UART1-BAUDRATE (0x40520001) - UART1 baudrate
+                    case 0x40520001:
+                        if (val32 > 0) {
+                            skorost_uart_0 = val32;
+                            uart_set_baudrate(uart0, skorost_uart_0);
                         }
                         break;
 
