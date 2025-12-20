@@ -113,3 +113,9 @@ SHA256_CTX ctx_copy = sec_sign_sha256_ctx;
 uint16_t packet_count = sec_sign_packet_count;  // Must capture BOTH together!
 ```
 This prevents race condition where Core0 increments counter after hash is copied.
+
+**TX Pause during SEC-SIGN computation (Dec 2025 fix):**
+- `sec_sign_in_progress` flag pauses all TX while SEC-SIGN is being computed
+- Fixes race condition where packets sent AFTER hash capture but BEFORE SEC-SIGN TX
+- Without pause: drone receives packets NOT included in SEC-SIGN hash → verification fails
+- Flow: `callback_4sec` sets pause → Core1 computes → `callback_1hz` sends SEC-SIGN → clears pause

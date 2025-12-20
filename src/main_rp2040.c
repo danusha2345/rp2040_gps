@@ -122,8 +122,9 @@ volatile uint8_t nav_timeref = 0;            // Time reference (0=UTC, 1=GPS, et
 // SEC-SIGN variables (always enabled, first at 3s, then every 4s)
 SHA256_CTX sec_sign_sha256_ctx;
 volatile uint16_t sec_sign_packet_count = 0;
-volatile bool sec_sign_request = false;  // Core0 -> Core1 signal
-volatile bool sec_sign_ready = false;    // Core1 -> Core0 signal
+volatile bool sec_sign_request = false;     // Core0 -> Core1 signal
+volatile bool sec_sign_ready = false;       // Core1 -> Core0 signal
+volatile bool sec_sign_in_progress = false; // Pause TX while computing SEC-SIGN
 
 // FreeRTOS handles (Core0)
 TimerHandle_t TTimer_10hz, TTimer_1hz, TTimer_first_sec_sign, TTimer_4sec, TTimer_msg_start;
@@ -472,6 +473,16 @@ void off_uart0(void) {
 // ============================================================================
 
 void callback_1hz(TimerHandle_t xTimer) {
+    // If SEC-SIGN is in progress, only check if ready and send
+    if (sec_sign_in_progress) {
+        if (sec_sign_ready) {
+            sec_sign_ready = false;
+            uart_write_blocking(uart0, UBX_SEC_SIGN, sizeof(UBX_SEC_SIGN));
+            sec_sign_in_progress = false;  // Resume normal TX
+        }
+        return;
+    }
+
     flag = !flag;
     secunda2();
 
@@ -504,16 +515,13 @@ void callback_1hz(TimerHandle_t xTimer) {
         sec_sign_accumulate(UBX_MON_RF, sizeof(UBX_MON_RF));
     }
 
-    // Check if Core1 has computed SEC-SIGN signature
-    if (sec_sign_ready) {
-        sec_sign_ready = false;
-        uart_write_blocking(uart0, UBX_SEC_SIGN, sizeof(UBX_SEC_SIGN));
-    }
-
     flag = !flag;
 }
 
 void callback_10hz(TimerHandle_t xTimer) {
+    // Skip while SEC-SIGN is being computed
+    if (sec_sign_in_progress) return;
+
     flag = !flag;
     secunda();
 
@@ -599,14 +607,16 @@ void callback_10hz(TimerHandle_t xTimer) {
 }
 
 void callback_first_sec_sign(TimerHandle_t xTimer) {
-    // Signal Core1 to compute first SEC-SIGN
+    // Pause TX and signal Core1 to compute first SEC-SIGN
+    sec_sign_in_progress = true;
     sec_sign_request = true;
     // Start periodic 4-second timer for subsequent SEC-SIGN messages
     xTimerStart(TTimer_4sec, 0);
 }
 
 void callback_4sec(TimerHandle_t xTimer) {
-    // Signal Core1 to compute SEC-SIGN
+    // Pause TX and signal Core1 to compute SEC-SIGN
+    sec_sign_in_progress = true;
     sec_sign_request = true;
 }
 
