@@ -376,9 +376,10 @@ void sec_sign_accumulate(const uint8_t *msg, size_t len) {
 
 // Core1: Compute SEC-SIGN signature (heavy ECDSA operation)
 void sec_sign_compute(void) {
-    // Get accumulated SHA256 hash
+    // Capture hash AND packet count atomically (before Core0 can modify them)
     uint8_t sha256_field[32];
     SHA256_CTX ctx_copy = sec_sign_sha256_ctx;
+    uint16_t packet_count = sec_sign_packet_count;  // Capture count at same moment as hash
     sha256_final(&ctx_copy, sha256_field);
 
     // SessionID is zeros for M10
@@ -410,8 +411,8 @@ void sec_sign_compute(void) {
     // Build SEC-SIGN message
     UBX_SEC_SIGN[6] = 0x01;
     UBX_SEC_SIGN[7] = 0x00;
-    UBX_SEC_SIGN[8] = sec_sign_packet_count & 0xFF;
-    UBX_SEC_SIGN[9] = (sec_sign_packet_count >> 8) & 0xFF;
+    UBX_SEC_SIGN[8] = packet_count & 0xFF;
+    UBX_SEC_SIGN[9] = (packet_count >> 8) & 0xFF;
     memcpy(&UBX_SEC_SIGN[10], sha256_field, 32);
     memcpy(&UBX_SEC_SIGN[42], sessionId, 24);
     memcpy(&UBX_SEC_SIGN[66], signature, 24);

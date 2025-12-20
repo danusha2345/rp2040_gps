@@ -371,9 +371,10 @@ void sec_sign_accumulate(const uint8_t *msg, size_t len) {
 }
 
 void sec_sign_send(void) {
-    // Get accumulated SHA256 hash
+    // Capture hash AND packet count atomically (before Core0 can modify them)
     uint8_t sha256_field[32];
     SHA256_CTX ctx_copy = sec_sign_sha256_ctx;
+    uint16_t packet_count = sec_sign_packet_count;  // Capture count at same moment as hash
     sha256_final(&ctx_copy, sha256_field);
 
     // SessionID is zeros for M10
@@ -409,8 +410,8 @@ void sec_sign_send(void) {
     UBX_SEC_SIGN[7] = 0x00;
 
     // Packet count (bytes 8-9, little-endian)
-    UBX_SEC_SIGN[8] = sec_sign_packet_count & 0xFF;
-    UBX_SEC_SIGN[9] = (sec_sign_packet_count >> 8) & 0xFF;
+    UBX_SEC_SIGN[8] = packet_count & 0xFF;
+    UBX_SEC_SIGN[9] = (packet_count >> 8) & 0xFF;
 
     // SHA256 field (bytes 10-41)
     memcpy(&UBX_SEC_SIGN[10], sha256_field, 32);
