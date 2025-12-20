@@ -114,6 +114,11 @@ volatile bool timepulse_fl = false;
 // Flag to start message transmission after 1 second delay
 volatile bool msg_output_started = false;
 
+// NAV rate configuration (for CFG-RATE and CFG-VALSET)
+volatile uint16_t nav_meas_period_ms = 200;  // Measurement period in ms (default 5Hz)
+volatile uint16_t nav_rate = 1;              // Cycles per navigation solution
+volatile uint8_t nav_timeref = 0;            // Time reference (0=UTC, 1=GPS, etc.)
+
 // SEC-SIGN variables (always enabled, first at 3s, then every 4s)
 SHA256_CTX sec_sign_sha256_ctx;
 volatile uint16_t sec_sign_packet_count = 0;
@@ -149,6 +154,18 @@ int pico_rng(uint8_t *dest, unsigned size);  // RNG for micro-ecc
 // Core1 functions
 void core1_entry(void);
 bool timer_callback(struct repeating_timer *t);
+// NAV timer update helper
+void update_nav_timer_period(void);
+
+// ============================================================================
+// NAV timer update (effective_period = meas_period * nav_rate)
+// ============================================================================
+void update_nav_timer_period(void) {
+    uint32_t effective_period = (uint32_t)nav_meas_period_ms * nav_rate;
+    if (effective_period < 50) effective_period = 50;
+    if (effective_period > 10000) effective_period = 10000;
+    xTimerChangePeriod(TTimer_10hz, pdMS_TO_TICKS(effective_period), 0);
+}
 
 // ============================================================================
 // WS2812 LED functions
@@ -741,10 +758,21 @@ void on_uart_rx0(void) {
         }
     }
 
-    // UBX-CFG-RATE (0x06 0x08) - Navigation rate
+    // UBX-CFG-RATE (0x06 0x08) - Navigation rate (6 bytes payload)
     if (RxData[2] == 0x06 && RxData[3] == 0x08 && count >= 14) {
-        int16_t period = RxData[7] << 8 | RxData[6];  // 16-bit period in ms
-        xTimerChangePeriod(TTimer_10hz, pdMS_TO_TICKS(period), 0);
+        // Parse: measRate (u16), navRate (u16), timeRef (u16)
+        uint16_t meas_rate = RxData[6] | (RxData[7] << 8);
+        uint16_t nav_rate_val = RxData[8] | (RxData[9] << 8);
+        uint16_t time_ref = RxData[10] | (RxData[11] << 8);
+
+        // Store values
+        if (meas_rate >= 50 && meas_rate <= 10000) nav_meas_period_ms = meas_rate;
+        if (nav_rate_val >= 1 && nav_rate_val <= 127) nav_rate = nav_rate_val;
+        nav_timeref = (uint8_t)time_ref;
+
+        // Update timer with effective period
+        update_nav_timer_period();
+
         uart_write_blocking(uart0, mes_2, sizeof(mes_2));
         otvet++;
     }
@@ -840,8 +868,22 @@ void on_uart_rx0(void) {
                     // CFG-RATE-MEAS (0x30210001) - measurement period in ms
                     case 0x30210001:
                         if (val16 >= 50 && val16 <= 10000) {
-                            xTimerChangePeriod(TTimer_10hz, pdMS_TO_TICKS(val16), 0);
+                            nav_meas_period_ms = val16;
+                            update_nav_timer_period();
                         }
+                        break;
+
+                    // CFG-RATE-NAV (0x30210002) - navigation rate (cycles per solution)
+                    case 0x30210002:
+                        if (val16 >= 1 && val16 <= 127) {
+                            nav_rate = val16;
+                            update_nav_timer_period();
+                        }
+                        break;
+
+                    // CFG-RATE-TIMEREF (0x20210003) - time reference
+                    case 0x20210003:
+                        nav_timeref = val8;
                         break;
 
                     // CFG-UART1-BAUDRATE (0x40520001) - UART1 baudrate
