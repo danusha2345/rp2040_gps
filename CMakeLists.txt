@@ -152,6 +152,8 @@ target_link_libraries(ublox_fake_${PROJECT_SUFFIX} PRIVATE
     hardware_gpio
     hardware_uart
     hardware_irq
+    hardware_flash
+    pico_flash
     pico_async_context_freertos
     FreeRTOS-Kernel-Heap4
 )
