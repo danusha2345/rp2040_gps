@@ -692,6 +692,24 @@ void core1_entry(void) {
     CRC_gen(Timepulse, sizeof(Timepulse));
     CRC_gen(UBX_NAV_POSECEF, sizeof(UBX_NAV_POSECEF));
     CRC_gen(UBX_NAV_POSLLH, sizeof(UBX_NAV_POSLLH));
+    CRC_gen(UBX_NAV_STATUS, sizeof(UBX_NAV_STATUS));
+    CRC_gen(UBX_NAV_DOP, sizeof(UBX_NAV_DOP));
+    CRC_gen(UBX_NAV_VELNED, sizeof(UBX_NAV_VELNED));
+    CRC_gen(UBX_NAV_TIMEUTC, sizeof(UBX_NAV_TIMEUTC));
+    CRC_gen(UBX_NAV_CLOCK, sizeof(UBX_NAV_CLOCK));
+    CRC_gen(UBX_NAV_SAT, sizeof(UBX_NAV_SAT));
+    CRC_gen(UBX_NAV_AOPSTATUS, sizeof(UBX_NAV_AOPSTATUS));
+    CRC_gen(UBX_NAV_EOE, sizeof(UBX_NAV_EOE));
+    CRC_gen(UBX_NAV_TIMEGPS, sizeof(UBX_NAV_TIMEGPS));
+    CRC_gen(UBX_NAV_VELECEF, sizeof(UBX_NAV_VELECEF));
+    CRC_gen(UBX_NAV_TIMELS, sizeof(UBX_NAV_TIMELS));
+    CRC_gen(UBX_NAV_COV, sizeof(UBX_NAV_COV));
+    CRC_gen(UBX_NAV_HPPOSECEF, sizeof(UBX_NAV_HPPOSECEF));
+    CRC_gen(UBX_MON_RF, sizeof(UBX_MON_RF));
+    CRC_gen(UBX_MON_COMMS, sizeof(UBX_MON_COMMS));
+    CRC_gen(UBX_MON_HW, sizeof(UBX_MON_HW));
+    CRC_gen(UBX_RXM_RAWX, sizeof(UBX_RXM_RAWX));
+    CRC_gen(UBX_SEC_UNIQID, sizeof(UBX_SEC_UNIQID));
 
     // Initialize mode button GPIO
     gpio_init(MODE_BTN_PWR);
@@ -735,6 +753,7 @@ void on_uart_rx0(void) {
 
     // UBX-MON-VER (0x0A 0x04) - Version request
     if (flag == 0 && RxData[2] == 0x0A && RxData[3] == 0x04) {
+        sec_sign_accumulate(monitor_ver_M10, sizeof(monitor_ver_M10));
         uart_write_blocking(uart0, monitor_ver_M10, sizeof(monitor_ver_M10));
         otvet++;
     }
@@ -748,6 +767,7 @@ void on_uart_rx0(void) {
         if (baudrate > 0) {
             skorost_uart_0 = baudrate;
             uart_set_baudrate(uart0, skorost_uart_0);
+            sec_sign_accumulate(mes_1, sizeof(mes_1));
             uart_write_blocking(uart0, mes_1, sizeof(mes_1));
             otvet++;
         } else {
@@ -774,42 +794,49 @@ void on_uart_rx0(void) {
         // Update timer with effective period
         update_nav_timer_period();
 
+        sec_sign_accumulate(mes_2, sizeof(mes_2));
         uart_write_blocking(uart0, mes_2, sizeof(mes_2));
         otvet++;
     }
 
     // UBX-CFG-CFG (0x06 0x09) - Configuration save/load/clear
     if (RxData[2] == 0x06 && RxData[3] == 0x09) {
+        sec_sign_accumulate(UBX_CFG_CFG, sizeof(UBX_CFG_CFG));
         uart_write_blocking(uart0, UBX_CFG_CFG, sizeof(UBX_CFG_CFG));
         otvet++;
     }
 
     // UBX-CFG-NAV5 (0x06 0x24) - Navigation engine settings
     if (RxData[2] == 0x06 && RxData[3] == 0x24) {
+        sec_sign_accumulate(mes_3, sizeof(mes_3));
         uart_write_blocking(uart0, mes_3, sizeof(mes_3));
         otvet++;
     }
 
     // UBX-CFG-NAVX5 (0x06 0x23) - Navigation engine expert settings
     if (RxData[2] == 0x06 && RxData[3] == 0x23) {
+        sec_sign_accumulate(mes_4, sizeof(mes_4));
         uart_write_blocking(uart0, mes_4, sizeof(mes_4));
         otvet++;
     }
 
     // UBX-CFG-GNSS (0x06 0x3E) - GNSS system configuration
     if (RxData[2] == 0x06 && RxData[3] == 0x3E) {
+        sec_sign_accumulate(mes_5, sizeof(mes_5));
         uart_write_blocking(uart0, mes_5, sizeof(mes_5));
         otvet++;
     }
 
     // UBX-CFG-PMS (0x06 0x86) - Power management settings
     if (RxData[2] == 0x06 && RxData[3] == 0x86) {
+        sec_sign_accumulate(mes_6, sizeof(mes_6));
         uart_write_blocking(uart0, mes_6, sizeof(mes_6));
         otvet++;
     }
 
     // UBX-CFG-MSG (0x06 0x01) - Message configuration (needs 11+ bytes)
     if (count >= 11 && RxData[2] == 0x06 && RxData[3] == 0x01) {
+        sec_sign_accumulate(mes_7, sizeof(mes_7));
         uart_write_blocking(uart0, mes_7, sizeof(mes_7));
         otvet++;
 
@@ -955,6 +982,7 @@ void on_uart_rx0(void) {
         }
 
         // Send ACK for CFG-VALSET
+        sec_sign_accumulate(UBX_CFG_VALSET, sizeof(UBX_CFG_VALSET));
         uart_write_blocking(uart0, UBX_CFG_VALSET, sizeof(UBX_CFG_VALSET));
         otvet++;
 
@@ -968,6 +996,7 @@ void on_uart_rx0(void) {
     if (count >= 8 && RxData[2] == 0x27 && RxData[3] == 0x03) {
         uint16_t payload_len = RxData[4] | (RxData[5] << 8);
         if (payload_len == 0) {  // Poll request (no payload)
+            sec_sign_accumulate(UBX_SEC_UNIQID, sizeof(UBX_SEC_UNIQID));
             uart_write_blocking(uart0, UBX_SEC_UNIQID, sizeof(UBX_SEC_UNIQID));
             otvet++;
         }

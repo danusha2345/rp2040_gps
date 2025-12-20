@@ -100,5 +100,8 @@ Mode persists in flash (last sector). Button toggles mode.
 
 - ECDSA SECP192R1 via micro-ecc library
 - Private key in `sec_sign_private_key[24]`
-- All transmitted UBX messages accumulated in SHA256 context
-- Signature computed on Core1 every 4 seconds (first at 3s)
+- **ALL transmitted UBX messages accumulated in SHA256 context** (34 message types)
+  - Includes: NAV-*, MON-*, RXM-*, TIM-*, ACK-*, CFG responses, SEC-UNIQID
+  - Excludes: SEC-SIGN itself (the signature message)
+- First signature at 3 seconds after startup, then every 4 seconds
+- Computation offloaded to Core1 (CPU-intensive ECDSA)
