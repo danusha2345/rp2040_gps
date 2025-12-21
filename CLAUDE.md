@@ -96,6 +96,23 @@ Updated via `update_nav_timer_period()` which calls `xTimerChangePeriod()`.
 
 Mode persists in flash (last sector). Button toggles mode.
 
+## Satellite Constellation
+
+Emulator reports **18 satellites** (from real GNSS log capture):
+- **9 GPS**: SV1, SV2, SV3, SV10, SV12, SV26, SV28, SV31, SV32
+- **3 SBAS**: SV131, SV133, SV138 (EGNOS/WAAS)
+- **6 Galileo**: E05, E08, E13, E15, E16, E31
+
+All satellites report:
+- **CNO**: 30-35 dBHz (signal quality)
+- **Flags**: 0x191F (qualityInd=7, svUsed=1, health=1, ephAvail=1)
+- **Status**: Used in navigation solution
+
+Messages containing satellite data:
+- `UBX-NAV-SAT` (0x01 0x35) - M10 format with gnssId per satellite
+- `UBX-NAV-SVINFO` (0x01 0x30) - M8 format with encoded svId
+- `UBX-NAV-PVT` - numSV=18 at byte offset [27]
+
 ## SEC-SIGN Cryptography
 
 - **SEC-SIGN message**: class 0x27, id 0x04 (108 bytes payload)
