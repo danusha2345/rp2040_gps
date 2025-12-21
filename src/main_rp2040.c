@@ -124,7 +124,10 @@ SHA256_CTX sec_sign_sha256_ctx;
 volatile uint16_t sec_sign_packet_count = 0;
 volatile bool sec_sign_request = false;     // Core0 -> Core1 signal
 volatile bool sec_sign_ready = false;       // Core1 -> Core0 signal
-volatile bool sec_sign_in_progress = false; // Pause TX while computing SEC-SIGN
+volatile bool sec_sign_pending = false;     // TX must wait for SEC-SIGN before sending new packets
+// Snapshot for Core1 computation (captured atomically by Core0)
+SHA256_CTX sec_sign_sha256_ctx_snapshot;
+volatile uint16_t sec_sign_packet_count_snapshot = 0;
 
 // FreeRTOS handles (Core0)
 TimerHandle_t TTimer_10hz, TTimer_1hz, TTimer_first_sec_sign, TTimer_4sec, TTimer_msg_start;
@@ -377,10 +380,10 @@ void sec_sign_accumulate(const uint8_t *msg, size_t len) {
 
 // Core1: Compute SEC-SIGN signature (heavy ECDSA operation)
 void sec_sign_compute(void) {
-    // Capture hash AND packet count atomically (before Core0 can modify them)
+    // Use snapshot captured by Core0 (already atomically captured and reset)
     uint8_t sha256_field[32];
-    SHA256_CTX ctx_copy = sec_sign_sha256_ctx;
-    uint16_t packet_count = sec_sign_packet_count;  // Capture count at same moment as hash
+    SHA256_CTX ctx_copy = sec_sign_sha256_ctx_snapshot;
+    uint16_t packet_count = sec_sign_packet_count_snapshot;
     sha256_final(&ctx_copy, sha256_field);
 
     // SessionID is zeros for M10
@@ -423,11 +426,8 @@ void sec_sign_compute(void) {
     CRC_gen(UBX_SEC_SIGN, sizeof(UBX_SEC_SIGN));
 
     // Signal Core0 that signature is ready
+    // Core0 will send SEC-SIGN and reset context before sending any new packets
     sec_sign_ready = true;
-
-    // Reset for next interval
-    sha256_init(&sec_sign_sha256_ctx);
-    sec_sign_packet_count = 0;
 }
 
 // ============================================================================
@@ -473,14 +473,19 @@ void off_uart0(void) {
 // ============================================================================
 
 void callback_1hz(TimerHandle_t xTimer) {
-    // If SEC-SIGN is in progress, only check if ready and send
-    if (sec_sign_in_progress) {
-        if (sec_sign_ready) {
-            sec_sign_ready = false;
-            uart_write_blocking(uart0, UBX_SEC_SIGN, sizeof(UBX_SEC_SIGN));
-            sec_sign_in_progress = false;  // Resume normal TX
+    // If SEC-SIGN is pending, wait for Core1 to finish, then send before any new packets
+    if (sec_sign_pending) {
+        // Brief busy-wait for ECDSA computation (~5-10ms typical)
+        while (!sec_sign_ready) {
+            tight_loop_contents();
         }
-        return;
+        // Send SEC-SIGN immediately (before any new packets)
+        sec_sign_ready = false;
+        uart_write_blocking(uart0, UBX_SEC_SIGN, sizeof(UBX_SEC_SIGN));
+        // Reset context for next interval (new packets accumulate here)
+        sha256_init(&sec_sign_sha256_ctx);
+        sec_sign_packet_count = 0;
+        sec_sign_pending = false;
     }
 
     flag = !flag;
@@ -519,8 +524,20 @@ void callback_1hz(TimerHandle_t xTimer) {
 }
 
 void callback_10hz(TimerHandle_t xTimer) {
-    // Skip while SEC-SIGN is being computed
-    if (sec_sign_in_progress) return;
+    // If SEC-SIGN is pending, wait for Core1 to finish, then send before any new packets
+    if (sec_sign_pending) {
+        // Brief busy-wait for ECDSA computation (~5-10ms typical)
+        while (!sec_sign_ready) {
+            tight_loop_contents();
+        }
+        // Send SEC-SIGN immediately (before any new packets)
+        sec_sign_ready = false;
+        uart_write_blocking(uart0, UBX_SEC_SIGN, sizeof(UBX_SEC_SIGN));
+        // Reset context for next interval (new packets accumulate here)
+        sha256_init(&sec_sign_sha256_ctx);
+        sec_sign_packet_count = 0;
+        sec_sign_pending = false;
+    }
 
     flag = !flag;
     secunda();
@@ -607,16 +624,24 @@ void callback_10hz(TimerHandle_t xTimer) {
 }
 
 void callback_first_sec_sign(TimerHandle_t xTimer) {
-    // Pause TX and signal Core1 to compute first SEC-SIGN
-    sec_sign_in_progress = true;
+    // Capture snapshot for Core1 (context will be reset after SEC-SIGN is sent)
+    sec_sign_sha256_ctx_snapshot = sec_sign_sha256_ctx;
+    sec_sign_packet_count_snapshot = sec_sign_packet_count;
+    // Mark pending - callbacks must wait for SEC-SIGN before sending new packets
+    sec_sign_pending = true;
+    // Signal Core1 to compute signature from snapshot
     sec_sign_request = true;
     // Start periodic 4-second timer for subsequent SEC-SIGN messages
     xTimerStart(TTimer_4sec, 0);
 }
 
 void callback_4sec(TimerHandle_t xTimer) {
-    // Pause TX and signal Core1 to compute SEC-SIGN
-    sec_sign_in_progress = true;
+    // Capture snapshot for Core1 (context will be reset after SEC-SIGN is sent)
+    sec_sign_sha256_ctx_snapshot = sec_sign_sha256_ctx;
+    sec_sign_packet_count_snapshot = sec_sign_packet_count;
+    // Mark pending - callbacks must wait for SEC-SIGN before sending new packets
+    sec_sign_pending = true;
+    // Signal Core1 to compute signature from snapshot
     sec_sign_request = true;
 }
 

@@ -107,15 +107,26 @@ Mode persists in flash (last sector). Button toggles mode.
 - First signature at 3 seconds after startup, then every 4 seconds
 - Computation offloaded to Core1 (CPU-intensive ECDSA)
 
-**Critical: Atomic capture in `sec_sign_compute()`:**
-```c
-SHA256_CTX ctx_copy = sec_sign_sha256_ctx;
-uint16_t packet_count = sec_sign_packet_count;  // Must capture BOTH together!
+**SEC-SIGN synchronization (RP2040 - dual-core):**
 ```
-This prevents race condition where Core0 increments counter after hash is copied.
+callback_4sec:
+  1. Capture snapshot: sha256_ctx_snapshot, packet_count_snapshot
+  2. Set sec_sign_pending = true
+  3. Signal Core1 (sec_sign_request = true)
 
-**TX Pause during SEC-SIGN computation (Dec 2025 fix):**
-- `sec_sign_in_progress` flag pauses all TX while SEC-SIGN is being computed
-- Fixes race condition where packets sent AFTER hash capture but BEFORE SEC-SIGN TX
-- Without pause: drone receives packets NOT included in SEC-SIGN hash → verification fails
-- Flow: `callback_4sec` sets pause → Core1 computes → `callback_1hz` sends SEC-SIGN → clears pause
+Core1 sec_sign_compute():
+  - Uses snapshot variables (not main context)
+  - Computes ECDSA signature (~5-10ms)
+  - Sets sec_sign_ready = true
+
+callback_10hz/callback_1hz:
+  - If sec_sign_pending: busy-wait for sec_sign_ready
+  - Send SEC-SIGN immediately
+  - Reset main context (sha256_init, packet_count=0)
+  - Clear sec_sign_pending
+  - Continue with normal packet TX
+```
+
+**Key insight**: SEC-SIGN must be sent BEFORE any new packets, otherwise drone's hash verification fails. Callbacks wait (~5-10ms) instead of returning early (which caused packet drops).
+
+**RP2350 variant**: Uses synchronous `sec_sign_send()` - simpler since FreeRTOS timer callbacks are serialized.

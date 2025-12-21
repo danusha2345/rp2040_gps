@@ -122,7 +122,7 @@ volatile uint8_t nav_timeref = 0;            // Time reference (0=UTC, 1=GPS, et
 // SEC-SIGN variables (always enabled, first at 3s, then every 4s)
 SHA256_CTX sec_sign_sha256_ctx;
 volatile uint16_t sec_sign_packet_count = 0;
-volatile bool sec_sign_in_progress = false; // Pause TX while computing SEC-SIGN
+// Note: sec_sign_send() is synchronous, FreeRTOS timer callbacks are serialized
 
 // FreeRTOS handles
 TimerHandle_t TTimer_10hz, TTimer_1hz, TTimer_first_sec_sign, TTimer_4sec, TTimer_msg_start;
@@ -490,9 +490,6 @@ void vOneTimeTask(void *pvParameters) {
 // ============================================================================
 
 void callback_1hz(TimerHandle_t xTimer) {
-    // Skip while SEC-SIGN is being computed
-    if (sec_sign_in_progress) return;
-
     flag = !flag;
     secunda2();
 
@@ -529,9 +526,6 @@ void callback_1hz(TimerHandle_t xTimer) {
 }
 
 void callback_10hz(TimerHandle_t xTimer) {
-    // Skip while SEC-SIGN is being computed
-    if (sec_sign_in_progress) return;
-
     flag = !flag;
     secunda();
 
@@ -617,19 +611,15 @@ void callback_10hz(TimerHandle_t xTimer) {
 }
 
 void callback_first_sec_sign(TimerHandle_t xTimer) {
-    // Pause TX, compute and send first SEC-SIGN
-    sec_sign_in_progress = true;
+    // Compute and send first SEC-SIGN (synchronous, ~5-10ms)
     sec_sign_send();
-    sec_sign_in_progress = false;
     // Start periodic 4-second timer for subsequent SEC-SIGN messages
     xTimerStart(TTimer_4sec, 0);
 }
 
 void callback_4sec(TimerHandle_t xTimer) {
-    // Pause TX, compute and send SEC-SIGN
-    sec_sign_in_progress = true;
+    // Compute and send SEC-SIGN (synchronous, ~5-10ms)
     sec_sign_send();
-    sec_sign_in_progress = false;
 }
 
 void callback_msg_start(TimerHandle_t xTimer) {
