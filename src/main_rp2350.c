@@ -346,7 +346,7 @@ void secunda(void) {
 }
 
 void secunda2(void) {
-    // Update time fields (sec, min, hour)
+    // Update time fields in NAV-PVT (sec at [16], min at [15], hour at [14])
     UBX_NAV_PVT[16] = UBX_NAV_PVT[16] + 0x01;  // seconds
     if (UBX_NAV_PVT[16] == 0x3C) {  // 60 seconds
         UBX_NAV_PVT[16] = 0x00;
@@ -360,6 +360,21 @@ void secunda2(void) {
         }
     }
     CRC_gen(UBX_NAV_PVT, sizeof(UBX_NAV_PVT));
+
+    // Update time fields in NAV-TIMEUTC (sec at [24], min at [23], hour at [22])
+    UBX_NAV_TIMEUTC[24] = UBX_NAV_TIMEUTC[24] + 0x01;  // seconds
+    if (UBX_NAV_TIMEUTC[24] == 0x3C) {  // 60 seconds
+        UBX_NAV_TIMEUTC[24] = 0x00;
+        UBX_NAV_TIMEUTC[23] = UBX_NAV_TIMEUTC[23] + 0x01;  // minutes
+        if (UBX_NAV_TIMEUTC[23] == 0x3C) {  // 60 minutes
+            UBX_NAV_TIMEUTC[23] = 0x00;
+            UBX_NAV_TIMEUTC[22] = UBX_NAV_TIMEUTC[22] + 0x01;  // hours
+            if (UBX_NAV_TIMEUTC[22] == 0x18) {  // 24 hours
+                UBX_NAV_TIMEUTC[22] = 0x00;
+            }
+        }
+    }
+    CRC_gen(UBX_NAV_TIMEUTC, sizeof(UBX_NAV_TIMEUTC));
 }
 
 // ============================================================================
